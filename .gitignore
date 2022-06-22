@@ -63,4 +63,3 @@ logs/
 *.db
 
 tmp/
-config.toml

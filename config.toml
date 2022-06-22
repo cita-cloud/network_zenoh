@@ -1,0 +1,23 @@
+[network_zenoh]
+grpc_port = 50000
+protocol = 'quic'
+domain = 'peer0'
+port = 40000
+ca_cert = 'cert/ca_cert.pem'
+cert = 'cert/peer0/cert.pem'
+priv_key = 'cert/peer0/key.pem'
+
+[[network_zenoh.peers]]
+domain = 'peer1'
+protocol = 'quic'
+port = 40001
+
+[[network_zenoh.peers]]
+domain = 'peer2'
+protocol = 'quic'
+port = 40002
+
+[[network_zenoh.peers]]
+domain = 'peer3'
+protocol = 'quic'
+port = 40003
