@@ -64,4 +64,3 @@ logs/
 
 tmp/
 config.toml
-*.yaml
