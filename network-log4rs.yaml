@@ -30,3 +30,7 @@ root:
   appenders:
     - stdout
     - journey-service
+
+loggers:
+  quinn:
+    level: warn
