@@ -1,0 +1,27 @@
+[package]
+name = "network"
+version = "6.4.0"
+authors = ["Rivtower Technologies <contact@rivtower.com>"]
+edition = "2021"
+
+[dependencies]
+zenoh = { git = "https://github.com/eclipse-zenoh/zenoh.git" }
+flume = "0.10"
+tokio = { version = "1", features = ["rt-multi-thread", "time"] }
+tokio-util = "0.7"
+parking_lot = "0.12"
+toml = "0.5"
+serde = { version = "1", features = ["derive"] }
+bytes = "1"
+thiserror =  "1"
+clap = { version = "3.1", features = ["derive"] }
+backtrace = "0.3"
+log = "0.4"
+log4rs = { version = "1.1", features = ["gzip"] }
+
+tonic = "0.5"
+prost = "0.8"
+
+cloud-util = { git = "https://github.com/cita-cloud/cloud-util.git", branch = "network_zenoh" }
+cita_cloud_proto = { git = "https://github.com/cita-cloud/cita_cloud_proto.git", branch = "network_zenoh" }
+status_code = { package = "cloud-code", git = "https://github.com/cita-cloud/status_code.git", branch = "network_zenoh" }
