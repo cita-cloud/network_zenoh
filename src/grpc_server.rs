@@ -34,6 +34,7 @@ pub struct CitaCloudNetworkServiceServer {
     pub peers: Arc<RwLock<PeersManger>>,
     pub inbound_msg_tx: Sender<NetworkMsg>,
     pub outbound_msg_tx: Sender<NetworkMsg>,
+    pub chain_origin: u64,
 }
 
 #[tonic::async_trait]
@@ -44,22 +45,7 @@ impl NetworkService for CitaCloudNetworkServiceServer {
     ) -> Result<Response<StatusCode>, tonic::Status> {
         let msg = request.into_inner();
         debug!("send_msg: {:?}", &msg);
-        let peers = self.peers.read();
-        if peers
-            .get_connected_peers()
-            .iter()
-            .any(|peer| peer == &msg.domain)
-        {
-            let _ = self.outbound_msg_tx.send(msg);
-        } else {
-            // TODO: check if it's necessary
-            // fallback to broadcast
-            for domain in peers.get_known_peers().keys() {
-                let mut msg = msg.clone();
-                msg.domain = domain.to_owned();
-                let _ = self.outbound_msg_tx.send(msg);
-            }
-        }
+        let _ = self.outbound_msg_tx.send(msg);
         Ok(Response::new(status_code::StatusCode::Success.into()))
     }
 
@@ -67,15 +53,10 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         &self,
         request: Request<NetworkMsg>,
     ) -> Result<Response<StatusCode>, tonic::Status> {
-        let msg = request.into_inner();
+        let mut msg = request.into_inner();
         debug!("broadcast: {:?}", &msg);
-        let peers = self.peers.read();
-
-        for domain in peers.get_known_peers().keys() {
-            let mut msg = msg.clone();
-            msg.domain = domain.to_owned();
-            let _ = self.outbound_msg_tx.send(msg);
-        }
+        msg.origin = self.chain_origin;
+        let _ = self.outbound_msg_tx.send(msg);
 
         Ok(Response::new(status_code::StatusCode::Success.into()))
     }
@@ -121,7 +102,9 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         &self,
         request: Request<NodeNetInfo>,
     ) -> Result<Response<StatusCode>, tonic::Status> {
-        let address = request.into_inner().multi_address;
+        let node_net_info = request.into_inner();
+        let address = node_net_info.multi_address;
+        let origin = node_net_info.origin;
         let endpoint: zenoh::prelude::config::EndPoint = address.parse().map_err(|_| {
             warn!("parse_addr: not a valid address: {}", address);
             Status::invalid_argument(status_code::StatusCode::MultiAddrParseError.to_string())
@@ -150,7 +133,7 @@ impl NetworkService for CitaCloudNetworkServiceServer {
 
         peers.add_known_peers(domain.to_string(), peer);
 
-        info!("peer added: {}", &address);
+        info!("peer added: {}:{}", &address, &origin);
 
         Ok(Response::new(status_code::StatusCode::Success.into()))
     }
@@ -160,12 +143,14 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         _request: Request<Empty>,
     ) -> Result<Response<TotalNodeNetInfo>, tonic::Status> {
         let mut node_infos: Vec<NodeNetInfo> = vec![];
-        let guard = self.peers.read();
-        for domain in guard.get_connected_peers().iter() {
-            node_infos.push(NodeNetInfo {
-                multi_address: domain.to_string(),
-                domain: domain.to_string(),
-            });
+        let peers = self.peers.read();
+        for origin in peers.get_connected_peers().iter() {
+            if let Some(peer_config) = peers.get_known_peers().get(origin) {
+                node_infos.push(NodeNetInfo {
+                    multi_address: peer_config.get_address(),
+                    origin: 0,
+                });
+            }
         }
 
         Ok(Response::new(TotalNodeNetInfo { nodes: node_infos }))

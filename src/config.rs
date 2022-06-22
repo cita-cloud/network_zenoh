@@ -22,6 +22,12 @@ pub struct PeerConfig {
     pub domain: String,
 }
 
+impl PeerConfig {
+    pub fn get_address(&self) -> String {
+        format!("{}/{}:{}", self.protocol, self.domain, self.port)
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(default)]
 pub struct NetworkConfig {
@@ -41,11 +47,38 @@ pub struct NetworkConfig {
     pub priv_key: String,
     // peers net config info
     pub peers: Vec<PeerConfig>,
+    // node address
+    pub node_address: String,
+    // validator address
+    pub validator_address: String,
+    // chain id
+    pub chain_id: String,
 }
 
 impl NetworkConfig {
     pub fn new(config_str: &str) -> Self {
         read_toml(config_str, "network_zenoh")
+    }
+    pub fn get_address(&self) -> String {
+        format!("{}/{}:{}", self.protocol, self.domain, self.port)
+    }
+    pub fn get_node_origin(&self) -> u64 {
+        let tmp = self.node_address.split_at(16).0;
+        let mut decoded = [0; 8];
+        hex::decode_to_slice(tmp, &mut decoded).unwrap();
+        u64::from_ne_bytes(decoded)
+    }
+    pub fn get_validator_origin(&self) -> u64 {
+        let tmp = self.validator_address.split_at(16).0;
+        let mut decoded = [0; 8];
+        hex::decode_to_slice(tmp, &mut decoded).unwrap();
+        u64::from_ne_bytes(decoded)
+    }
+    pub fn get_chain_origin(&self) -> u64 {
+        let tmp = self.chain_id.split_at(16).0;
+        let mut decoded = [0; 8];
+        hex::decode_to_slice(tmp, &mut decoded).unwrap();
+        u64::from_ne_bytes(decoded)
     }
 }
 
@@ -60,6 +93,9 @@ impl Default for NetworkConfig {
             ca_cert: "".to_string(),
             cert: "".to_string(),
             priv_key: "".to_string(),
+            node_address: "".to_string(),
+            validator_address: "".to_string(),
+            chain_id: "".to_string(),
         }
     }
 }

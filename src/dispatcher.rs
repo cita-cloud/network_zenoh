@@ -37,18 +37,18 @@ impl NetworkMsgDispatcher {
 
             if let Some(mut client) = client {
                 let msg_module = msg.module.clone();
-                let msg_domain = msg.domain.clone();
+                let msg_origin = msg.origin;
                 tokio::spawn(async move {
                     if let Err(e) = client.process_network_msg(msg).await {
                         warn!(
-                            "registered client processes network msg failed: msg.module {} msg.origin {}, error: {}", &msg_module, &msg_domain, e
+                            "registered client processes network msg failed: msg.module {} msg.origin {}, error: {}", &msg_module, &msg_origin, e
                         );
                     }
                 });
             } else {
                 warn!(
                     "unregistered module, will drop msg: msg.module {} msg.origin {}",
-                    &msg.module, &msg.domain
+                    &msg.module, &msg.origin
                 );
             }
         }

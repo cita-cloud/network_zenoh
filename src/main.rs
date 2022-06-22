@@ -29,7 +29,7 @@ use cita_cloud_proto::{
 };
 use clap::Parser;
 use flume::bounded;
-use log::{error, info};
+use log::{debug, error, info};
 use panic_hook::set_panic_handler;
 use parking_lot::RwLock;
 use prost::Message;
@@ -113,7 +113,7 @@ async fn run(opts: RunOpts) {
     // knownpeers
     let mut peers_map = HashMap::new();
     for peer in &config.peers {
-        peers_map.insert(peer.domain.clone(), peer.clone());
+        peers_map.insert(peer.domain.to_string(), peer.clone());
     }
 
     // grpc server
@@ -122,6 +122,7 @@ async fn run(opts: RunOpts) {
         peers: Arc::new(RwLock::new(PeersManger::new(peers_map))),
         inbound_msg_tx: inbound_msg_tx.clone(),
         outbound_msg_tx,
+        chain_origin: config.get_chain_origin(),
     };
     let grpc_addr = format!("0.0.0.0:{}", grpc_port).parse().unwrap();
     tokio::spawn(async move {
@@ -144,7 +145,9 @@ async fn zenoh_serve(
 ) -> ! {
     let mut zenoh_config = zenoh::prelude::config::peer();
 
-    zenoh_config.set_id(Some(config.domain.clone())).unwrap();
+    zenoh_config
+        .set_id(Some(config.node_address.split_at(16).0.to_string()))
+        .unwrap();
     // Whether local writes/queries should reach local subscribers/queryables.
     zenoh_config.set_local_routing(Some(false)).unwrap();
     // If set to false, peers will never automatically establish sessions between each-other.
@@ -154,18 +157,16 @@ async fn zenoh_serve(
         .unwrap();
 
     // listen
-    zenoh_config.listen.endpoints.push(
-        format!("{}/{}:{}", config.protocol, config.domain, config.port)
-            .parse()
-            .unwrap(),
-    );
+    zenoh_config
+        .listen
+        .endpoints
+        .push(config.get_address().parse().unwrap());
     // connect to peers
-    for peer in config.peers {
-        zenoh_config.connect.endpoints.push(
-            format!("{}/{}:{}", peer.protocol, peer.domain, peer.port)
-                .parse()
-                .unwrap(),
-        );
+    for peer in &config.peers {
+        zenoh_config
+            .connect
+            .endpoints
+            .push(peer.get_address().parse().unwrap());
     }
     // cert
     zenoh_config
@@ -187,22 +188,59 @@ async fn zenoh_serve(
         .set_server_private_key(Some(config.priv_key.to_string()))
         .unwrap();
     let session = zenoh::open(zenoh_config).await.unwrap();
-    let mut subscriber = session.subscribe(config.domain).await.unwrap();
+    let mut node_subscriber = session
+        .subscribe(config.get_node_origin().to_string())
+        .await
+        .unwrap();
+    let mut validator_subscriber = session
+        .subscribe(config.get_validator_origin().to_string())
+        .await
+        .unwrap();
+    let mut chain_subscriber = session
+        .subscribe(config.get_chain_origin().to_string())
+        .await
+        .unwrap();
     loop {
         tokio::select! {
-            sample = subscriber.receiver().recv_async() => if let Ok(sample) = sample {
-                info!("inbound msg: {:?}", &sample);
+            sample = node_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
+                debug!("inbound msg: {:?}", &sample);
                 let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
                 inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
             },
-            outbound_msg = outbound_msg_rx.recv_async() => if let Ok(msg) = outbound_msg {
-                info!("outbound msg: {:?}", &msg);
-                let expr_id = session.declare_expr(&msg.domain).await.unwrap();
+            sample = validator_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
+                debug!("inbound msg: {:?}", &sample);
+                let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
+                inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
+            },
+            sample = chain_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
+                debug!("inbound msg: {:?}", &sample);
+                let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
+                inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
+            },
+            outbound_msg = outbound_msg_rx.recv_async() => if let Ok(mut msg) = outbound_msg {
+                debug!("outbound msg: {:?}", &msg);
+                let expr_id = session.declare_expr(&msg.origin.to_string()).await.unwrap();
                 session.declare_publication(expr_id).await.unwrap();
+                set_sent_msg_origin(&mut msg, &config);
                 let mut dst = BytesMut::new();
                 msg.encode(&mut dst).unwrap();
                 session.put(expr_id, &*dst).await.unwrap();
             }
         }
+    }
+}
+
+pub fn set_sent_msg_origin(msg: &mut NetworkMsg, network_config: &NetworkConfig) {
+    match msg.module.as_str() {
+        "consensus" => {
+            msg.origin = network_config.get_validator_origin();
+        }
+        "controller" => {
+            msg.origin = network_config.get_node_origin();
+        }
+        "" => {
+            msg.origin = network_config.get_chain_origin();
+        }
+        &_ => {}
     }
 }
