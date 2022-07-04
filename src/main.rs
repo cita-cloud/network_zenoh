@@ -192,39 +192,66 @@ async fn zenoh_serve(
         .subscribe(config.get_node_origin().to_string())
         .await
         .unwrap();
-    let mut validator_subscriber = session
-        .subscribe(config.get_validator_origin().to_string())
-        .await
-        .unwrap();
     let mut chain_subscriber = session
         .subscribe(config.get_chain_origin().to_string())
         .await
         .unwrap();
-    loop {
-        tokio::select! {
-            sample = node_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
-                debug!("inbound msg: {:?}", &sample);
-                let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
-                inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
-            },
-            sample = validator_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
-                debug!("inbound msg: {:?}", &sample);
-                let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
-                inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
-            },
-            sample = chain_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
-                debug!("inbound msg: {:?}", &sample);
-                let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
-                inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
-            },
-            outbound_msg = outbound_msg_rx.recv_async() => if let Ok(mut msg) = outbound_msg {
-                debug!("outbound msg: {:?}", &msg);
-                let expr_id = session.declare_expr(&msg.origin.to_string()).await.unwrap();
-                session.declare_publication(expr_id).await.unwrap();
-                set_sent_msg_origin(&mut msg, &config);
-                let mut dst = BytesMut::new();
-                msg.encode(&mut dst).unwrap();
-                session.put(expr_id, &*dst).await.unwrap();
+
+    if config.get_node_origin() != config.get_validator_origin() {
+        let mut validator_subscriber = session
+            .subscribe(config.get_validator_origin().to_string())
+            .await
+            .unwrap();
+        loop {
+            tokio::select! {
+                sample = node_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
+                    debug!("inbound msg: {:?}", &sample);
+                    let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
+                    inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
+                },
+                sample = validator_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
+                    debug!("inbound msg: {:?}", &sample);
+                    let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
+                    inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
+                },
+                sample = chain_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
+                    debug!("inbound msg: {:?}", &sample);
+                    let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
+                    inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
+                },
+                outbound_msg = outbound_msg_rx.recv_async() => if let Ok(mut msg) = outbound_msg {
+                    debug!("outbound msg: {:?}", &msg);
+                    let expr_id = session.declare_expr(&msg.origin.to_string()).await.unwrap();
+                    session.declare_publication(expr_id).await.unwrap();
+                    set_sent_msg_origin(&mut msg, &config);
+                    let mut dst = BytesMut::new();
+                    msg.encode(&mut dst).unwrap();
+                    session.put(expr_id, &*dst).await.unwrap();
+                }
+            }
+        }
+    } else {
+        loop {
+            tokio::select! {
+                sample = node_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
+                    debug!("inbound msg: {:?}", &sample);
+                    let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
+                    inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
+                },
+                sample = chain_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
+                    debug!("inbound msg: {:?}", &sample);
+                    let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
+                    inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
+                },
+                outbound_msg = outbound_msg_rx.recv_async() => if let Ok(mut msg) = outbound_msg {
+                    debug!("outbound msg: {:?}", &msg);
+                    let expr_id = session.declare_expr(&msg.origin.to_string()).await.unwrap();
+                    session.declare_publication(expr_id).await.unwrap();
+                    set_sent_msg_origin(&mut msg, &config);
+                    let mut dst = BytesMut::new();
+                    msg.encode(&mut dst).unwrap();
+                    session.put(expr_id, &*dst).await.unwrap();
+                }
             }
         }
     }
