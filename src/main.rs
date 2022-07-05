@@ -19,6 +19,7 @@ mod grpc_server;
 mod health_check;
 mod panic_hook;
 mod peer;
+mod util;
 
 use std::{collections::HashMap, sync::Arc};
 
@@ -33,6 +34,7 @@ use log::{debug, error, info};
 use panic_hook::set_panic_handler;
 use parking_lot::RwLock;
 use prost::Message;
+use util::write_to_file;
 use zenoh::{config::QoSConf, prelude::*};
 
 use crate::{
@@ -190,23 +192,32 @@ async fn zenoh_serve(
             .push(peer.get_address().parse().unwrap());
     }
     // cert
+    write_to_file(config.ca_cert.as_bytes(), "ca_cert.pem");
+    write_to_file(
+        config.cert.as_bytes(),
+        format!("{}_cert.pem", &config.domain),
+    );
+    write_to_file(
+        config.priv_key.as_bytes(),
+        format!("{}_key.pem", &config.domain),
+    );
     zenoh_config
         .transport
         .link
         .tls
-        .set_root_ca_certificate(Some(config.ca_cert.to_string()))
+        .set_root_ca_certificate(Some("ca_cert.pem".to_string()))
         .unwrap();
     zenoh_config
         .transport
         .link
         .tls
-        .set_server_certificate(Some(config.cert.to_string()))
+        .set_server_certificate(Some(format!("{}_cert.pem", &config.domain)))
         .unwrap();
     zenoh_config
         .transport
         .link
         .tls
-        .set_server_private_key(Some(config.priv_key.to_string()))
+        .set_server_private_key(Some(format!("{}_key.pem", &config.domain)))
         .unwrap();
 
     let session = zenoh::open(zenoh_config).await.unwrap();
