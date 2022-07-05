@@ -53,6 +53,16 @@ pub struct NetworkConfig {
     pub validator_address: String,
     // chain id
     pub chain_id: String,
+    // QoS
+    pub qos: bool,
+    // local_routing
+    pub local_routing: bool,
+    // peers_autoconnect
+    pub peers_autoconnect: bool,
+    // Link lease duration in milliseconds (default: 10000)
+    pub lease: u64,
+    // Number fo keep-alive messages in a link lease duration (default: 4)
+    pub keep_alive: usize,
 }
 
 impl NetworkConfig {
@@ -63,19 +73,19 @@ impl NetworkConfig {
         format!("{}/{}:{}", self.protocol, self.domain, self.port)
     }
     pub fn get_node_origin(&self) -> u64 {
-        let tmp = self.node_address.split_at(16).0;
+        let tmp = &self.node_address[0..16];
         let mut decoded = [0; 8];
         hex::decode_to_slice(tmp, &mut decoded).unwrap();
         u64::from_ne_bytes(decoded)
     }
     pub fn get_validator_origin(&self) -> u64 {
-        let tmp = self.validator_address.split_at(16).0;
+        let tmp = &self.validator_address[0..16];
         let mut decoded = [0; 8];
         hex::decode_to_slice(tmp, &mut decoded).unwrap();
         u64::from_ne_bytes(decoded)
     }
     pub fn get_chain_origin(&self) -> u64 {
-        let tmp = self.chain_id.split_at(16).0;
+        let tmp = &self.chain_id[0..16];
         let mut decoded = [0; 8];
         hex::decode_to_slice(tmp, &mut decoded).unwrap();
         u64::from_ne_bytes(decoded)
@@ -96,6 +106,11 @@ impl Default for NetworkConfig {
             node_address: "".to_string(),
             validator_address: "".to_string(),
             chain_id: "".to_string(),
+            qos: true,
+            local_routing: false,
+            peers_autoconnect: false,
+            lease: 10000,
+            keep_alive: 4,
         }
     }
 }

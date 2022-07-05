@@ -33,7 +33,7 @@ use log::{debug, error, info};
 use panic_hook::set_panic_handler;
 use parking_lot::RwLock;
 use prost::Message;
-use zenoh::prelude::*;
+use zenoh::{config::QoSConf, prelude::*};
 
 use crate::{
     config::NetworkConfig, dispatcher::NetworkMsgDispatcher,
@@ -146,14 +146,35 @@ async fn zenoh_serve(
     let mut zenoh_config = zenoh::prelude::config::peer();
 
     zenoh_config
-        .set_id(Some(config.node_address.split_at(16).0.to_string()))
+        .set_id(Some(config.node_address[0..16].to_string()))
         .unwrap();
     // Whether local writes/queries should reach local subscribers/queryables.
-    zenoh_config.set_local_routing(Some(false)).unwrap();
+    zenoh_config
+        .set_local_routing(Some(config.local_routing))
+        .unwrap();
     // If set to false, peers will never automatically establish sessions between each-other.
     zenoh_config
         .scouting
-        .set_peers_autoconnect(Some(false))
+        .set_peers_autoconnect(Some(config.peers_autoconnect))
+        .unwrap();
+    // QoS
+    zenoh_config
+        .transport
+        .set_qos(QoSConf::new(config.qos).unwrap())
+        .unwrap();
+    // Link lease duration in milliseconds (default: 10000)
+    zenoh_config
+        .transport
+        .link
+        .tx
+        .set_lease(Some(config.lease))
+        .unwrap();
+    // Number fo keep-alive messages in a link lease duration (default: 4)
+    zenoh_config
+        .transport
+        .link
+        .tx
+        .set_keep_alive(Some(config.keep_alive))
         .unwrap();
 
     // listen
@@ -187,7 +208,9 @@ async fn zenoh_serve(
         .tls
         .set_server_private_key(Some(config.priv_key.to_string()))
         .unwrap();
+
     let session = zenoh::open(zenoh_config).await.unwrap();
+
     let mut node_subscriber = session
         .subscribe(config.get_node_origin().to_string())
         .await
