@@ -27,6 +27,7 @@ use tonic::{Request, Response, Status};
 
 use crate::config::PeerConfig;
 use crate::peer::PeersManger;
+use crate::util::parse_multiaddr;
 
 #[derive(Clone)]
 pub struct CitaCloudNetworkServiceServer {
@@ -103,24 +104,34 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         request: Request<NodeNetInfo>,
     ) -> Result<Response<StatusCode>, tonic::Status> {
         let node_net_info = request.into_inner();
-        let address = node_net_info.multi_address;
-        let origin = node_net_info.origin;
+        let multiaddr = node_net_info.multi_address;
+
+        let (_, port, domain) = parse_multiaddr(&multiaddr).ok_or_else(|| {
+            warn!(
+                "parse_multiaddr: not a valid tls multi-address: {}",
+                &multiaddr
+            );
+            Status::invalid_argument(status_code::StatusCode::MultiAddrParseError.to_string())
+        })?;
+
+        let address = format!("quic/{}:{}", domain, port);
+
         let endpoint: zenoh::prelude::config::EndPoint = address.parse().map_err(|_| {
             warn!("parse_addr: not a valid address: {}", address);
             Status::invalid_argument(status_code::StatusCode::MultiAddrParseError.to_string())
         })?;
+
         let address = endpoint.locator.address();
         info!("attempt to add new peer: {}", &address);
 
         let mut peers = self.peers.write();
-        let (domain, port) = address.split_once(':').unwrap();
-        if peers.get_connected_peers().contains(domain) {
+        if peers.get_connected_peers().contains(&domain) {
             //add a connected peer
             return Ok(Response::new(
                 status_code::StatusCode::AddExistedPeer.into(),
             ));
         }
-        if peers.get_known_peers().contains_key(domain) {
+        if peers.get_known_peers().contains_key(&domain) {
             //add a known peer which is already trying to connect, return success
             return Ok(Response::new(status_code::StatusCode::Success.into()));
         }
@@ -128,12 +139,12 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         let peer = PeerConfig {
             protocol: endpoint.locator.protocol().to_string(),
             domain: domain.to_string(),
-            port: port.parse().unwrap(),
+            port,
         };
 
-        peers.add_known_peers(domain.to_string(), peer);
+        peers.add_known_peers(domain, peer);
 
-        info!("peer added: {}:{}", &address, &origin);
+        info!("peer added: {}", &address);
 
         Ok(Response::new(status_code::StatusCode::Success.into()))
     }
@@ -144,13 +155,11 @@ impl NetworkService for CitaCloudNetworkServiceServer {
     ) -> Result<Response<TotalNodeNetInfo>, tonic::Status> {
         let mut node_infos: Vec<NodeNetInfo> = vec![];
         let peers = self.peers.read();
-        for origin in peers.get_connected_peers().iter() {
-            if let Some(peer_config) = peers.get_known_peers().get(origin) {
-                node_infos.push(NodeNetInfo {
-                    multi_address: peer_config.get_address(),
-                    origin: 0,
-                });
-            }
+        for addr in peers.get_connected_peers().iter() {
+            node_infos.push(NodeNetInfo {
+                multi_address: addr.to_string(),
+                origin: 0,
+            });
         }
 
         Ok(Response::new(TotalNodeNetInfo { nodes: node_infos }))

@@ -21,7 +21,10 @@ mod panic_hook;
 mod peer;
 mod util;
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use bytes::BytesMut;
 use cita_cloud_proto::{
@@ -35,7 +38,10 @@ use panic_hook::set_panic_handler;
 use parking_lot::RwLock;
 use prost::Message;
 use util::write_to_file;
-use zenoh::{config::QoSConf, prelude::*};
+use zenoh::{
+    config::{EndPoint, QoSConf},
+    prelude::*,
+};
 
 use crate::{
     config::NetworkConfig, dispatcher::NetworkMsgDispatcher,
@@ -118,10 +124,12 @@ async fn run(opts: RunOpts) {
         peers_map.insert(peer.domain.to_string(), peer.clone());
     }
 
+    let peers = Arc::new(RwLock::new(PeersManger::new(peers_map)));
+
     // grpc server
     let network_svc = CitaCloudNetworkServiceServer {
         dispatch_table,
-        peers: Arc::new(RwLock::new(PeersManger::new(peers_map))),
+        peers: peers.clone(),
         inbound_msg_tx: inbound_msg_tx.clone(),
         outbound_msg_tx,
         chain_origin: config.get_chain_origin(),
@@ -137,10 +145,11 @@ async fn run(opts: RunOpts) {
     });
 
     // run zenoh peer
-    zenoh_serve(config, inbound_msg_tx, outbound_msg_rx).await
+    zenoh_serve(peers, config, inbound_msg_tx, outbound_msg_rx).await
 }
 
 async fn zenoh_serve(
+    peers: Arc<RwLock<PeersManger>>,
     config: NetworkConfig,
     inbound_msg_tx: flume::Sender<NetworkMsg>,
     outbound_msg_rx: flume::Receiver<NetworkMsg>,
@@ -231,6 +240,8 @@ async fn zenoh_serve(
         .await
         .unwrap();
 
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(3));
+
     if config.get_node_origin() != config.get_validator_origin() {
         let mut validator_subscriber = session
             .subscribe(config.get_validator_origin().to_string())
@@ -261,7 +272,25 @@ async fn zenoh_serve(
                     let mut dst = BytesMut::new();
                     msg.encode(&mut dst).unwrap();
                     session.put(expr_id, &*dst).await.unwrap();
-                }
+                },
+                _ = interval.tick() => {
+                    let endpoints: Vec<EndPoint> = session
+                        .config()
+                        .get("connect/endpoints")
+                        .unwrap()
+                        .downcast_ref::<Vec<EndPoint>>()
+                        .unwrap()
+                        .to_vec();
+                    debug!("{:?}", endpoints);
+                    let mut peer_set = HashSet::new();
+                    for endpoint in endpoints {
+                        peer_set.insert(endpoint.locator.address().to_string());
+                    }
+                    {
+                        let mut peers = peers.write();
+                        peers.set_connected_peers(peer_set);
+                    }
+                },
             }
         }
     } else {
@@ -285,7 +314,25 @@ async fn zenoh_serve(
                     let mut dst = BytesMut::new();
                     msg.encode(&mut dst).unwrap();
                     session.put(expr_id, &*dst).await.unwrap();
-                }
+                },
+                _ = interval.tick() => {
+                    let endpoints: Vec<EndPoint> = session
+                        .config()
+                        .get("connect/endpoints")
+                        .unwrap()
+                        .downcast_ref::<Vec<EndPoint>>()
+                        .unwrap()
+                        .to_vec();
+                    debug!("{:?}", endpoints);
+                    let mut peer_set = HashSet::new();
+                    for endpoint in endpoints {
+                        peer_set.insert(endpoint.locator.address().to_string());
+                    }
+                    {
+                        let mut peers = peers.write();
+                        peers.set_connected_peers(peer_set);
+                    }
+                },
             }
         }
     }

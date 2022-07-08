@@ -44,4 +44,8 @@ impl PeersManger {
     pub fn get_connected_peers(&self) -> &HashSet<String> {
         &self.connected_peers
     }
+
+    pub fn set_connected_peers(&mut self, peers: HashSet<String>) {
+        self.connected_peers = peers;
+    }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "network"
-version = "6.5.0"
+version = "6.6.0"
 authors = ["Rivtower Technologies <contact@rivtower.com>"]
 edition = "2021"
 
@@ -15,6 +15,7 @@ serde = { version = "1", features = ["derive"] }
 bytes = "1"
 hex = "0.4"
 thiserror =  "1"
+tentacle-multiaddr = "0.3"
 clap = { version = "3.1", features = ["derive"] }
 backtrace = "0.3"
 log = "0.4"
