@@ -53,14 +53,17 @@ OPTIONS:
     参见示例`example/config.toml`。
 
     其中：
-    * `ca_cert` 为`CA`根证书路径。
-    * `cert` 为节点证书路径。
-    * `priv_key` 为节点证书对应的私钥路径。
+    * `ca_cert` 为`CA`根证书。
+    * `cert` 为节点证书。
+    * `priv_key` 为节点证书对应的私钥。
     * `grpc_port` 为`gRPC`服务监听的端口号。
     * `protocol` 为`zenoh`服务协议类型：`tls`, `tcp`, `quic`
     * `domain` 为域名
     * `port` 为`zenoh`服务监听端口
     * `peers` 为`zenoh`邻居节点的网络信息，其中`protocol`字段为服务协议类型，`port`字段为端口号，`domain`字段为该邻居节点申请证书时使用的域名。
+    * `chain_id` 链的唯一标识
+    * `node_address` 节点地址
+    * `validator_address` 共识地址
 
 2. 日志配置文件。
 
