@@ -20,6 +20,8 @@ clap = { version = "3.1", features = ["derive"] }
 backtrace = "0.3"
 log = "0.4"
 log4rs = { version = "1.1", features = ["gzip"] }
+md5 = "0.7"
+json5 = "0.4"
 
 tonic = "0.5"
 prost = "0.8"

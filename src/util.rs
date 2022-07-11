@@ -1,6 +1,14 @@
-use std::{fs, io::Write, path};
+use cita_cloud_proto::network::NetworkMsg;
+use md5::{compute, Digest};
+use std::{
+    fs,
+    io::{Error, Write},
+    path::{self, Path},
+};
 
 use tentacle_multiaddr::{MultiAddr, Protocol};
+
+use crate::config::NetworkConfig;
 
 pub fn write_to_file(content: &[u8], path: impl AsRef<path::Path>) {
     let mut file = fs::OpenOptions::new()
@@ -50,4 +58,26 @@ pub fn parse_multiaddr(s: &str) -> Option<(String, u16, String)> {
         }
     }
     None
+}
+
+pub fn calculate_md5(path: impl AsRef<Path>) -> Result<Digest, Error> {
+    match fs::read_to_string(path) {
+        Ok(s) => Ok(compute(s)),
+        Err(e) => Err(e),
+    }
+}
+
+pub fn set_sent_msg_origin(msg: &mut NetworkMsg, network_config: &NetworkConfig) {
+    match msg.module.as_str() {
+        "consensus" => {
+            msg.origin = network_config.get_validator_origin();
+        }
+        "controller" => {
+            msg.origin = network_config.get_node_origin();
+        }
+        "" => {
+            msg.origin = network_config.get_chain_origin();
+        }
+        &_ => {}
+    }
 }

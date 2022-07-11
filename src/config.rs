@@ -63,6 +63,8 @@ pub struct NetworkConfig {
     pub lease: u64,
     // Number fo keep-alive messages in a link lease duration (default: 4)
     pub keep_alive: usize,
+    // config hot update interval, in senconds
+    pub hot_update_interval: u64,
 }
 
 impl NetworkConfig {
@@ -111,6 +113,7 @@ impl Default for NetworkConfig {
             peers_autoconnect: false,
             lease: 10000,
             keep_alive: 4,
+            hot_update_interval: 60,
         }
     }
 }

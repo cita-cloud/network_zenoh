@@ -48,4 +48,19 @@ impl PeersManger {
     pub fn set_connected_peers(&mut self, peers: HashSet<String>) {
         self.connected_peers = peers;
     }
+
+    fn delete_connected_peers(&mut self, domain: &str) {
+        if self.connected_peers.get(domain).is_some() {
+            debug!("delete_connected_peers: {}", domain);
+            self.connected_peers.remove(domain);
+        }
+    }
+
+    pub fn delete_peer(&mut self, domain: &str) {
+        if self.known_peers.contains_key(domain) {
+            debug!("delete_peer: {}", domain);
+            self.known_peers.remove(domain);
+            self.delete_connected_peers(domain);
+        }
+    }
 }
