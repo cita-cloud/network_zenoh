@@ -88,8 +88,7 @@ impl NetworkService for CitaCloudNetworkServiceServer {
                 .map_err(|e| {
                     tonic::Status::invalid_argument(format!("invalid host and port: {}", e))
                 })?
-                .connect_lazy()
-                .unwrap();
+                .connect_lazy();
             NetworkMsgHandlerServiceClient::new(channel)
         };
 
