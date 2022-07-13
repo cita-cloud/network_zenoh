@@ -52,3 +52,28 @@ port = 40002
 domain = 'test-chain-node3'
 protocol = 'quic'
 port = 40003
+
+[[network_zenoh.modules]]
+module_name = 'consensus'
+hostname = '127.0.0.1'
+port = 50001
+
+[[network_zenoh.modules]]
+module_name = 'executor'
+hostname = '127.0.0.1'
+port = 50002
+
+[[network_zenoh.modules]]
+module_name = 'storage'
+hostname = '127.0.0.1'
+port = 50003
+
+[[network_zenoh.modules]]
+module_name = 'controller'
+hostname = '127.0.0.1'
+port = 50004
+
+[[network_zenoh.modules]]
+module_name = 'crypto'
+hostname = '127.0.0.1'
+port = 50005

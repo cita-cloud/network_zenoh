@@ -64,6 +64,7 @@ OPTIONS:
     * `chain_id` 链的唯一标识
     * `node_address` 节点地址
     * `validator_address` 共识地址
+    * `modules` 为同节点的其它微服务网络信息，其中`module_name`字段为模块名称，`port`字段为该微服务的grpc端口号，`hostname`字段为该微服务的网络地址。
 
 2. 日志配置文件。
 

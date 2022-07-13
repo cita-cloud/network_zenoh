@@ -22,7 +22,7 @@ use log::{debug, info, warn};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tonic::transport::{Channel, Endpoint};
+use tonic::transport::Channel;
 use tonic::{Request, Response, Status};
 
 use crate::config::PeerConfig;
@@ -31,7 +31,7 @@ use crate::util::parse_multiaddr;
 
 #[derive(Clone)]
 pub struct CitaCloudNetworkServiceServer {
-    pub dispatch_table: Arc<RwLock<HashMap<String, NetworkMsgHandlerServiceClient<Channel>>>>,
+    pub dispatch_table: HashMap<String, NetworkMsgHandlerServiceClient<Channel>>,
     pub peers: Arc<RwLock<PeersManger>>,
     pub inbound_msg_tx: Sender<NetworkMsg>,
     pub outbound_msg_tx: Sender<NetworkMsg>,
@@ -75,26 +75,8 @@ impl NetworkService for CitaCloudNetworkServiceServer {
 
     async fn register_network_msg_handler(
         &self,
-        request: Request<RegisterInfo>,
+        _request: Request<RegisterInfo>,
     ) -> Result<Response<StatusCode>, tonic::Status> {
-        let info = request.into_inner();
-        let module_name = info.module_name;
-        let hostname = info.hostname;
-        let port = info.port;
-
-        let client = {
-            let uri = format!("http://{}:{}", hostname, port);
-            let channel = Endpoint::from_shared(uri)
-                .map_err(|e| {
-                    tonic::Status::invalid_argument(format!("invalid host and port: {}", e))
-                })?
-                .connect_lazy();
-            NetworkMsgHandlerServiceClient::new(channel)
-        };
-
-        let mut dispatch_table = self.dispatch_table.write();
-        dispatch_table.insert(module_name, client);
-
         Ok(Response::new(status_code::StatusCode::Success.into()))
     }
 

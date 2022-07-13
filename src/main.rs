@@ -26,13 +26,17 @@ use std::{collections::HashMap, sync::Arc};
 
 use cita_cloud_proto::{
     health_check::health_server::HealthServer,
-    network::network_service_server::NetworkServiceServer,
+    network::{
+        network_msg_handler_service_client::NetworkMsgHandlerServiceClient,
+        network_service_server::NetworkServiceServer,
+    },
 };
 use clap::Parser;
 use flume::bounded;
 use log::info;
 use panic_hook::set_panic_handler;
 use parking_lot::RwLock;
+use tonic::transport::Endpoint;
 
 use crate::{
     config::NetworkConfig, dispatcher::NetworkMsgDispatcher,
@@ -101,7 +105,22 @@ async fn run(opts: RunOpts) {
     let (outbound_msg_tx, outbound_msg_rx) = bounded(1024);
 
     // dispatcher run
-    let dispatch_table = Arc::new(RwLock::new(HashMap::new()));
+    let mut dispatch_table = HashMap::new();
+
+    for module in &config.modules {
+        let client = {
+            let uri = format!("http://{}:{}", module.hostname, module.port);
+            let channel = Endpoint::from_shared(uri)
+                .map_err(|e| {
+                    tonic::Status::invalid_argument(format!("invalid host and port: {}", e))
+                })
+                .unwrap()
+                .connect_lazy();
+            NetworkMsgHandlerServiceClient::new(channel)
+        };
+        dispatch_table.insert(module.module_name.to_string(), client);
+    }
+
     let dispatcher = NetworkMsgDispatcher {
         dispatch_table: dispatch_table.clone(),
         inbound_msg_rx,

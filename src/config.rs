@@ -28,6 +28,13 @@ impl PeerConfig {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ModuleConfig {
+    pub module_name: String,
+    pub hostname: String,
+    pub port: u16,
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(default)]
 pub struct NetworkConfig {
@@ -65,6 +72,8 @@ pub struct NetworkConfig {
     pub keep_alive: usize,
     // config hot update interval, in senconds
     pub hot_update_interval: u64,
+    // modules config info
+    pub modules: Vec<ModuleConfig>,
 }
 
 impl NetworkConfig {
@@ -114,6 +123,7 @@ impl Default for NetworkConfig {
             lease: 10000,
             keep_alive: 4,
             hot_update_interval: 60,
+            modules: vec![],
         }
     }
 }
