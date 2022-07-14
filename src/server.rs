@@ -30,7 +30,7 @@ use crate::{
     grpc_server::CitaCloudNetworkServiceServer,
     hot_update::try_hot_update,
     peer::PeersManger,
-    util::{self, calculate_md5, set_sent_msg_origin},
+    util::{self, calculate_md5},
 };
 
 pub async fn zenoh_serve(
@@ -174,7 +174,7 @@ pub async fn zenoh_serve(
                     debug!("outbound msg: {:?}", &msg);
                     let expr_id = session.declare_expr(&msg.origin.to_string()).await.unwrap();
                     session.declare_publication(expr_id).await.unwrap();
-                    set_sent_msg_origin(&mut msg, &config);
+                    msg.origin = config.get_node_origin();
                     let mut dst = BytesMut::new();
                     msg.encode(&mut dst).unwrap();
                     session.put(expr_id, &*dst).await.unwrap();
@@ -232,7 +232,7 @@ pub async fn zenoh_serve(
                     debug!("outbound msg: {:?}", &msg);
                     let expr_id = session.declare_expr(&msg.origin.to_string()).await.unwrap();
                     session.declare_publication(expr_id).await.unwrap();
-                    set_sent_msg_origin(&mut msg, &config);
+                    msg.origin = config.get_node_origin();
                     let mut dst = BytesMut::new();
                     msg.encode(&mut dst).unwrap();
                     session.put(expr_id, &*dst).await.unwrap();
