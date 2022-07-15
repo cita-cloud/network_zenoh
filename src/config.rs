@@ -87,19 +87,19 @@ impl NetworkConfig {
         let tmp = &self.node_address[0..16];
         let mut decoded = [0; 8];
         hex::decode_to_slice(tmp, &mut decoded).unwrap();
-        u64::from_ne_bytes(decoded)
+        u64::from_be_bytes(decoded)
     }
     pub fn get_validator_origin(&self) -> u64 {
         let tmp = &self.validator_address[0..16];
         let mut decoded = [0; 8];
         hex::decode_to_slice(tmp, &mut decoded).unwrap();
-        u64::from_ne_bytes(decoded)
+        u64::from_be_bytes(decoded)
     }
     pub fn get_chain_origin(&self) -> u64 {
         let tmp = &self.chain_id[0..16];
         let mut decoded = [0; 8];
         hex::decode_to_slice(tmp, &mut decoded).unwrap();
-        u64::from_ne_bytes(decoded)
+        u64::from_be_bytes(decoded)
     }
 }
 
