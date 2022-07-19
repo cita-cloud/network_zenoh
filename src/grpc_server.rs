@@ -12,17 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use cita_cloud_proto::client::InterceptedSvc;
 use cita_cloud_proto::common::{Empty, NodeNetInfo, StatusCode, TotalNodeNetInfo};
 use cita_cloud_proto::network::{
     network_msg_handler_service_client::NetworkMsgHandlerServiceClient,
     network_service_server::NetworkService, NetworkMsg, NetworkStatusResponse, RegisterInfo,
 };
+use cita_cloud_proto::retry::RetryClient;
 use flume::Sender;
 use log::{debug, info, warn};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tonic::transport::Channel;
 use tonic::{Request, Response, Status};
 
 use crate::config::PeerConfig;
@@ -31,7 +32,8 @@ use crate::util::parse_multiaddr;
 
 #[derive(Clone)]
 pub struct CitaCloudNetworkServiceServer {
-    pub dispatch_table: HashMap<String, NetworkMsgHandlerServiceClient<Channel>>,
+    pub dispatch_table:
+        HashMap<String, RetryClient<NetworkMsgHandlerServiceClient<InterceptedSvc>>>,
     pub peers: Arc<RwLock<PeersManger>>,
     pub inbound_msg_tx: Sender<NetworkMsg>,
     pub outbound_msg_tx: Sender<NetworkMsg>,
