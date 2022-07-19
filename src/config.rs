@@ -74,6 +74,8 @@ pub struct NetworkConfig {
     pub hot_update_interval: u64,
     // modules config info
     pub modules: Vec<ModuleConfig>,
+    /// health check timeout
+    pub health_check_timeout: u64,
 }
 
 impl NetworkConfig {
@@ -124,6 +126,7 @@ impl Default for NetworkConfig {
             keep_alive: 4,
             hot_update_interval: 60,
             modules: vec![],
+            health_check_timeout: 300,
         }
     }
 }

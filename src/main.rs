@@ -147,10 +147,14 @@ async fn run(opts: RunOpts) {
     };
     let network_svc_hot_update = network_svc.clone();
     let grpc_addr = format!("0.0.0.0:{}", grpc_port).parse().unwrap();
+    let peers_for_health_check = peers.clone();
     tokio::spawn(async move {
         tonic::transport::Server::builder()
             .add_service(NetworkServiceServer::new(network_svc))
-            .add_service(HealthServer::new(HealthCheckServer {}))
+            .add_service(HealthServer::new(HealthCheckServer::new(
+                peers_for_health_check,
+                config.health_check_timeout,
+            )))
             .serve(grpc_addr)
             .await
             .unwrap();
