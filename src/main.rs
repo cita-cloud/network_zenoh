@@ -40,6 +40,8 @@ use crate::{
     server::zenoh_serve,
 };
 
+const CLIENT_NAME: &str = "network";
+
 fn main() {
     set_panic_handler();
     let opts: Opts = Opts::parse();
@@ -106,7 +108,7 @@ async fn run(opts: RunOpts) {
     for module in &config.modules {
         let client = {
             let client_options = ClientOptions::new(
-                module.module_name.clone(),
+                CLIENT_NAME.to_string(),
                 format!("http://{}:{}", module.hostname, module.port),
             );
             client_options.connect_network_msg_handler().unwrap()
