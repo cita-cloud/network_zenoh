@@ -14,16 +14,18 @@
 
 use std::collections::HashMap;
 
+use cita_cloud_proto::client::{InterceptedSvc, NetworkMsgHandlerServiceClientTrait};
 use cita_cloud_proto::network::{
     network_msg_handler_service_client::NetworkMsgHandlerServiceClient, NetworkMsg,
 };
+use cita_cloud_proto::retry::RetryClient;
 use flume::Receiver;
 use log::warn;
-use tonic::transport::Channel;
 
 pub struct NetworkMsgDispatcher {
     pub inbound_msg_rx: Receiver<NetworkMsg>,
-    pub dispatch_table: HashMap<String, NetworkMsgHandlerServiceClient<Channel>>,
+    pub dispatch_table:
+        HashMap<String, RetryClient<NetworkMsgHandlerServiceClient<InterceptedSvc>>>,
 }
 
 impl NetworkMsgDispatcher {
@@ -31,7 +33,7 @@ impl NetworkMsgDispatcher {
         while let Ok(msg) = self.inbound_msg_rx.recv_async().await {
             let client = { self.dispatch_table.get(&msg.module).cloned() };
 
-            if let Some(mut client) = client {
+            if let Some(client) = client {
                 let msg_module = msg.module.clone();
                 let msg_origin = msg.origin;
                 tokio::spawn(async move {

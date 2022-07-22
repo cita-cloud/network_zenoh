@@ -25,24 +25,22 @@ mod util;
 use std::{collections::HashMap, sync::Arc};
 
 use cita_cloud_proto::{
-    health_check::health_server::HealthServer,
-    network::{
-        network_msg_handler_service_client::NetworkMsgHandlerServiceClient,
-        network_service_server::NetworkServiceServer,
-    },
+    client::ClientOptions, health_check::health_server::HealthServer,
+    network::network_service_server::NetworkServiceServer,
 };
 use clap::Parser;
 use flume::bounded;
 use log::info;
 use panic_hook::set_panic_handler;
 use parking_lot::RwLock;
-use tonic::transport::Endpoint;
 
 use crate::{
     config::NetworkConfig, dispatcher::NetworkMsgDispatcher,
     grpc_server::CitaCloudNetworkServiceServer, health_check::HealthCheckServer, peer::PeersManger,
     server::zenoh_serve,
 };
+
+const CLIENT_NAME: &str = "network";
 
 fn main() {
     set_panic_handler();
@@ -109,16 +107,13 @@ async fn run(opts: RunOpts) {
 
     for module in &config.modules {
         let client = {
-            let uri = format!("http://{}:{}", module.hostname, module.port);
-            let channel = Endpoint::from_shared(uri)
-                .map_err(|e| {
-                    tonic::Status::invalid_argument(format!("invalid host and port: {}", e))
-                })
-                .unwrap()
-                .connect_lazy();
-            NetworkMsgHandlerServiceClient::new(channel)
+            let client_options = ClientOptions::new(
+                CLIENT_NAME.to_string(),
+                format!("http://{}:{}", module.hostname, module.port),
+            );
+            client_options.connect_network_msg_handler().unwrap()
         };
-        dispatch_table.insert(module.module_name.to_string(), client);
+        dispatch_table.insert(module.module_name.clone(), client);
     }
 
     let dispatcher = NetworkMsgDispatcher {
