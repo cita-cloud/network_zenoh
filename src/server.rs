@@ -21,7 +21,7 @@ use parking_lot::RwLock;
 use prost::Message;
 use util::write_to_file;
 use zenoh::{
-    config::{EndPoint, QoSConf},
+    config::{EndPoint, QoSConf, WhatAmI},
     prelude::*,
 };
 
@@ -60,6 +60,18 @@ pub async fn zenoh_serve(
         .set_peers_autoconnect(Some(config.peers_autoconnect))
         .unwrap();
 
+    zenoh_config
+        .scouting
+        .multicast
+        .set_enabled(Some(false))
+        .unwrap();
+
+    zenoh_config
+        .scouting
+        .gossip
+        .set_autoconnect(Some(WhatAmI::Peer | WhatAmI::Router))
+        .unwrap();
+
     // QoS
     zenoh_config
         .transport
@@ -80,6 +92,25 @@ pub async fn zenoh_serve(
         .link
         .tx
         .set_keep_alive(Some(config.keep_alive))
+        .unwrap();
+
+    // Receiving buffer size in bytes for each link
+    // The default the rx_buffer_size value is the same as the default batch size: 65335.
+    // For very high throughput scenarios, the rx_buffer_size can be increased to accomoda
+    // more in-flight data. This is particularly relevant when dealing with large messages
+    // E.g. for 16MiB rx_buffer_size set the value to: 16777216.
+    zenoh_config
+        .transport
+        .link
+        .rx
+        .set_buffer_size(Some(16777216))
+        .unwrap();
+
+    // the shared-memory transport will be disabled.
+    zenoh_config
+        .transport
+        .shared_memory
+        .set_enabled(false)
         .unwrap();
 
     // Set listen endpoints
@@ -153,25 +184,24 @@ pub async fn zenoh_serve(
             tokio::select! {
                 // node subscriber
                 sample = node_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
-                    debug!("inbound msg: {:?}", &sample);
                     let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
+                    debug!("inbound msg controller: {:?}", &msg);
                     network_svc.inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
                 },
                 // validator subscriber
                 sample = validator_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
-                    debug!("inbound msg: {:?}", &sample);
                     let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
+                    debug!("inbound msg validator: {:?}", &msg);
                     network_svc.inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
                 },
                 // chain subscriber
                 sample = chain_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
-                    debug!("inbound msg: {:?}", &sample);
                     let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
+                    debug!("inbound msg chain: {:?}", &msg);
                     network_svc.inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
                 },
                 // outbound msg
                 outbound_msg = outbound_msg_rx.recv_async() => if let Ok(mut msg) = outbound_msg {
-                    debug!("outbound msg: {:?}", &msg);
                     let expr_id = session.declare_expr(&msg.origin.to_string()).await.unwrap();
                     session.declare_publication(expr_id).await.unwrap();
                     msg.origin = config.get_node_origin();
@@ -217,19 +247,18 @@ pub async fn zenoh_serve(
             tokio::select! {
                 // node subscriber
                 sample = node_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
-                    debug!("inbound msg: {:?}", &sample);
                     let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
+                    debug!("inbound msg node: {:?}", &msg);
                     network_svc.inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
                 },
                 // chain subscriber
                 sample = chain_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
-                    debug!("inbound msg: {:?}", &sample);
                     let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
+                    debug!("inbound msg chain: {:?}", &msg);
                     network_svc.inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
                 },
                 // outbound msg
                 outbound_msg = outbound_msg_rx.recv_async() => if let Ok(mut msg) = outbound_msg {
-                    debug!("outbound msg: {:?}", &msg);
                     let expr_id = session.declare_expr(&msg.origin.to_string()).await.unwrap();
                     session.declare_publication(expr_id).await.unwrap();
                     msg.origin = config.get_node_origin();
