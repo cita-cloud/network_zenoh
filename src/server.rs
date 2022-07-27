@@ -169,6 +169,7 @@ pub async fn zenoh_serve(
             debug!("inbound msg node: {:?}", &msg);
             inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
         })
+        .best_effort()
         .wait()
         .unwrap();
 
@@ -183,6 +184,7 @@ pub async fn zenoh_serve(
             debug!("inbound msg chain: {:?}", &msg);
             inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
         })
+        .best_effort()
         .wait()
         .unwrap();
     let _validator_subscriber;
@@ -199,6 +201,7 @@ pub async fn zenoh_serve(
                 debug!("inbound msg validator: {:?}", &msg);
                 inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
             })
+            .best_effort()
             .wait()
             .unwrap();
     }
