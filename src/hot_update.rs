@@ -32,12 +32,15 @@ pub async fn try_hot_update(
     zenoh_config: &mut Notifier<Config>,
 ) {
     let new_config = NetworkConfig::new(path);
-    let known_peers = peers
-        .read()
-        .get_known_peers()
-        .iter()
-        .map(|(s, _)| s.to_owned())
-        .collect::<Vec<String>>();
+    let known_peers;
+    {
+        known_peers = peers
+            .read()
+            .get_known_peers()
+            .iter()
+            .map(|(s, _)| s.to_owned())
+            .collect::<Vec<String>>();
+    }
     debug!("known peers: {:?}", known_peers);
     let new_peers = new_config
         .peers

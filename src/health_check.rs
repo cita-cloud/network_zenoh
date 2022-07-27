@@ -50,10 +50,12 @@ impl Health for HealthCheckServer {
         &self,
         _request: Request<HealthCheckRequest>,
     ) -> Result<Response<HealthCheckResponse>, Status> {
-        let peer_count = self.peers.read().get_connected_peers().len() as u64;
         let timestamp = unix_now();
         let old_timestamp = self.timestamp.load(Ordering::Relaxed);
-
+        let peer_count;
+        {
+            peer_count = self.peers.read().get_connected_peers().len() as u64;
+        }
         let status = if peer_count > 0 {
             self.timestamp.store(timestamp, Ordering::Relaxed);
             ServingStatus::Serving.into()

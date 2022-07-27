@@ -20,7 +20,7 @@ use cita_cloud_proto::network::{
 };
 use cita_cloud_proto::retry::RetryClient;
 use flume::Sender;
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -48,7 +48,11 @@ impl NetworkService for CitaCloudNetworkServiceServer {
     ) -> Result<Response<StatusCode>, tonic::Status> {
         let msg = request.into_inner();
         debug!("send_msg: {:?}", &msg);
-        let _ = self.outbound_msg_tx.send(msg);
+        let _ = self
+            .outbound_msg_tx
+            .send_async(msg)
+            .await
+            .map_err(|e| error!("{e}"));
         Ok(Response::new(status_code::StatusCode::Success.into()))
     }
 
@@ -59,7 +63,11 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         let mut msg = request.into_inner();
         debug!("broadcast: {:?}", &msg);
         msg.origin = self.chain_origin;
-        let _ = self.outbound_msg_tx.send(msg);
+        let _ = self
+            .outbound_msg_tx
+            .send_async(msg)
+            .await
+            .map_err(|e| error!("{e}"));
 
         Ok(Response::new(status_code::StatusCode::Success.into()))
     }
@@ -107,26 +115,27 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         let address = endpoint.locator.address();
         info!("attempt to add new peer: {}", &address);
 
-        let mut peers = self.peers.write();
-        if peers.get_connected_peers().contains(&domain) {
-            //add a connected peer
-            return Ok(Response::new(
-                status_code::StatusCode::AddExistedPeer.into(),
-            ));
+        {
+            let mut peers = self.peers.write();
+            if peers.get_connected_peers().contains(&domain) {
+                //add a connected peer
+                return Ok(Response::new(
+                    status_code::StatusCode::AddExistedPeer.into(),
+                ));
+            }
+            if peers.get_known_peers().contains_key(&domain) {
+                //add a known peer which is already trying to connect, return success
+                return Ok(Response::new(status_code::StatusCode::Success.into()));
+            }
+
+            let peer = PeerConfig {
+                protocol: endpoint.locator.protocol().to_string(),
+                domain: domain.to_string(),
+                port,
+            };
+
+            peers.add_known_peers(domain, peer);
         }
-        if peers.get_known_peers().contains_key(&domain) {
-            //add a known peer which is already trying to connect, return success
-            return Ok(Response::new(status_code::StatusCode::Success.into()));
-        }
-
-        let peer = PeerConfig {
-            protocol: endpoint.locator.protocol().to_string(),
-            domain: domain.to_string(),
-            port,
-        };
-
-        peers.add_known_peers(domain, peer);
-
         info!("peer added: {}", &address);
 
         Ok(Response::new(status_code::StatusCode::Success.into()))
@@ -137,8 +146,11 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         _request: Request<Empty>,
     ) -> Result<Response<TotalNodeNetInfo>, tonic::Status> {
         let mut node_infos: Vec<NodeNetInfo> = vec![];
-        let peers = self.peers.read();
-        for addr in peers.get_connected_peers().iter() {
+        let peers;
+        {
+            peers = self.peers.read().get_connected_peers().clone();
+        }
+        for addr in peers.iter() {
             node_infos.push(NodeNetInfo {
                 multi_address: addr.to_string(),
                 origin: 0,

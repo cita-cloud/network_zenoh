@@ -38,7 +38,7 @@ pub async fn zenoh_serve(
     config_path: &str,
     network_svc: CitaCloudNetworkServiceServer,
     outbound_msg_rx: flume::Receiver<NetworkMsg>,
-) -> ! {
+) {
     // read config.toml
     let config = NetworkConfig::new(config_path);
     // Peer instance mode
@@ -158,145 +158,107 @@ pub async fn zenoh_serve(
 
     // open zenoh session
     let session = zenoh::open(zenoh_config).await.unwrap();
-
-    let mut node_subscriber = session
+    // node subscriber
+    let inbound_msg_tx = network_svc.inbound_msg_tx.clone();
+    let _node_subscriber = session
         .subscribe(config.get_node_origin().to_string())
-        .await
-        .unwrap();
-    let mut chain_subscriber = session
-        .subscribe(config.get_chain_origin().to_string())
-        .await
+        .callback(move |sample| {
+            let msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
+                .map_err(|e| error!("{e}"))
+                .unwrap();
+            debug!("inbound msg node: {:?}", &msg);
+            inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
+        })
+        .wait()
         .unwrap();
 
-    let mut hot_update_interval =
-        tokio::time::interval(tokio::time::Duration::from_secs(config.hot_update_interval));
+    // chain subscriber
+    let inbound_msg_tx = network_svc.inbound_msg_tx.clone();
+    let _chain_subscriber = session
+        .subscribe(config.get_chain_origin().to_string())
+        .callback(move |sample| {
+            let msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
+                .map_err(|e| error!("{e}"))
+                .unwrap();
+            debug!("inbound msg chain: {:?}", &msg);
+            inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
+        })
+        .wait()
+        .unwrap();
+    let _validator_subscriber;
+    // When the controller (node) address is the same as the consensus address, simply subscribe to the controller (node) address
+    if config.get_node_origin() != config.get_validator_origin() {
+        debug!("------ (node_origin != validator_origin)");
+        let inbound_msg_tx = network_svc.inbound_msg_tx.clone();
+        _validator_subscriber = session
+            .subscribe(config.get_validator_origin().to_string())
+            .callback(move |sample| {
+                let msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
+                    .map_err(|e| error!("{e}"))
+                    .unwrap();
+                debug!("inbound msg validator: {:?}", &msg);
+                inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
+            })
+            .wait()
+            .unwrap();
+    }
 
     let mut config_md5 = calculate_md5(&config_path).unwrap();
     debug!("config file initial md5: {:x}", config_md5);
 
-    // When the controller (node) address is the same as the consensus address, simply subscribe to the controller (node) address
-    if config.get_node_origin() != config.get_validator_origin() {
-        let mut validator_subscriber = session
-            .subscribe(config.get_validator_origin().to_string())
-            .await
-            .unwrap();
-        loop {
-            tokio::select! {
-                // node subscriber
-                sample = node_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
-                    let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
-                    debug!("inbound msg controller: {:?}", &msg);
-                    network_svc.inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
-                },
-                // validator subscriber
-                sample = validator_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
-                    let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
-                    debug!("inbound msg validator: {:?}", &msg);
-                    network_svc.inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
-                },
-                // chain subscriber
-                sample = chain_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
-                    let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
-                    debug!("inbound msg chain: {:?}", &msg);
-                    network_svc.inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
-                },
-                // outbound msg
-                outbound_msg = outbound_msg_rx.recv_async() => if let Ok(mut msg) = outbound_msg {
+    let mut hot_update_interval =
+        tokio::time::interval(tokio::time::Duration::from_secs(config.hot_update_interval));
+
+    loop {
+        tokio::select! {
+            // outbound msg
+            outbound_msg = outbound_msg_rx.recv_async() => match outbound_msg {
+                Ok(mut msg) => {
+                    debug!("outbound msg: {:?}", &msg);
                     let expr_id = session.declare_expr(&msg.origin.to_string()).await.unwrap();
                     session.declare_publication(expr_id).await.unwrap();
                     msg.origin = config.get_node_origin();
                     let mut dst = BytesMut::new();
                     msg.encode(&mut dst).unwrap();
                     session.put(expr_id, &*dst).await.unwrap();
-                },
-                // hot update
-                _ = hot_update_interval.tick() => {
-                    // update connected peers
-                    let endpoints: Vec<EndPoint> = session
-                        .config()
-                        .get("connect/endpoints")
-                        .unwrap()
-                        .downcast_ref::<Vec<EndPoint>>()
-                        .unwrap()
-                        .to_vec();
-                    debug!("{:?}", endpoints);
-                    let mut connected_peers = HashSet::new();
-                    for endpoint in endpoints {
-                        connected_peers.insert(endpoint.locator.address().to_string());
-                    }
-                    {
-                        let mut peers = peers.write();
-                        peers.set_connected_peers(connected_peers);
-                    }
+                }
+                Err(e) => debug!("outbound_msg_rx: {e}"),
+            },
+            // hot update
+             _ = hot_update_interval.tick() => {
+                // update connected peers
+                let endpoints: Vec<EndPoint> = session
+                    .config()
+                    .get("connect/endpoints")
+                    .map_err(|e| error!("{e}"))
+                    .unwrap()
+                    .downcast_ref::<Vec<EndPoint>>()
+                    .unwrap()
+                    .to_vec();
+                debug!("{:?}", endpoints);
+                let mut connected_peers = HashSet::new();
+                for endpoint in endpoints {
+                    connected_peers.insert(endpoint.locator.address().to_string());
+                }
+                {
+                    let mut peers = peers.write();
+                    peers.set_connected_peers(connected_peers);
+                }
 
-                    // hot update
-                    if let Ok(new_md5) = calculate_md5(&config_path) {
-                        if new_md5 != config_md5 {
-                            info!("config file new md5: {:x}", new_md5);
-                            config_md5 = new_md5;
-                            try_hot_update(config_path, network_svc.peers.clone(), session.config()).await;
-                        }
-                    } else {
-                        warn!("calculate config file md5 failed, make sure it's not removed");
-                    };
-                },
-            }
-        }
-    } else {
-        loop {
-            tokio::select! {
-                // node subscriber
-                sample = node_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
-                    let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
-                    debug!("inbound msg node: {:?}", &msg);
-                    network_svc.inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
-                },
-                // chain subscriber
-                sample = chain_subscriber.receiver().recv_async() => if let Ok(sample) = sample {
-                    let msg = NetworkMsg::decode(&*sample.value.payload.contiguous()).map_err(|e| error!("{e}")).unwrap();
-                    debug!("inbound msg chain: {:?}", &msg);
-                    network_svc.inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
-                },
-                // outbound msg
-                outbound_msg = outbound_msg_rx.recv_async() => if let Ok(mut msg) = outbound_msg {
-                    let expr_id = session.declare_expr(&msg.origin.to_string()).await.unwrap();
-                    session.declare_publication(expr_id).await.unwrap();
-                    msg.origin = config.get_node_origin();
-                    let mut dst = BytesMut::new();
-                    msg.encode(&mut dst).unwrap();
-                    session.put(expr_id, &*dst).await.unwrap();
-                },
                 // hot update
-                _ = hot_update_interval.tick() => {
-                    // update connected peers
-                    let endpoints: Vec<EndPoint> = session
-                        .config()
-                        .get("connect/endpoints")
-                        .unwrap()
-                        .downcast_ref::<Vec<EndPoint>>()
-                        .unwrap()
-                        .to_vec();
-                    debug!("{:?}", endpoints);
-                    let mut connected_peers = HashSet::new();
-                    for endpoint in endpoints {
-                        connected_peers.insert(endpoint.locator.address().to_string());
+                if let Ok(new_md5) = calculate_md5(&config_path) {
+                    if new_md5 != config_md5 {
+                        info!("config file new md5: {:x}", new_md5);
+                        config_md5 = new_md5;
+                        try_hot_update(config_path, network_svc.peers.clone(), session.config()).await;
                     }
-                    {
-                        let mut peers = peers.write();
-                        peers.set_connected_peers(connected_peers);
-                    }
-
-                    // hot update
-                    if let Ok(new_md5) = calculate_md5(&config_path) {
-                        if new_md5 != config_md5 {
-                            info!("config file new md5: {:x}", new_md5);
-                            config_md5 = new_md5;
-                            try_hot_update(config_path, network_svc.peers.clone(), session.config()).await;
-                        }
-                    } else {
-                        warn!("calculate config file md5 failed, make sure it's not removed");
-                    };
-                },
+                } else {
+                    warn!("calculate config file md5 failed, make sure it's not removed");
+                };
+            },
+            else => {
+                debug!("network stopped!");
+                break;
             }
         }
     }

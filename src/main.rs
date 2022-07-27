@@ -29,7 +29,7 @@ use cita_cloud_proto::{
     network::network_service_server::NetworkServiceServer,
 };
 use clap::Parser;
-use flume::bounded;
+use flume::unbounded;
 use log::info;
 use panic_hook::set_panic_handler;
 use parking_lot::RwLock;
@@ -97,10 +97,10 @@ async fn run(opts: RunOpts) {
     info!("grpc port of this service: {}", &grpc_port);
 
     // inbound_msg
-    let (inbound_msg_tx, inbound_msg_rx) = bounded(1024);
+    let (inbound_msg_tx, inbound_msg_rx) = unbounded();
 
     // outbound_msg
-    let (outbound_msg_tx, outbound_msg_rx) = bounded(1024);
+    let (outbound_msg_tx, outbound_msg_rx) = unbounded();
 
     // dispatcher run
     let mut dispatch_table = HashMap::new();
