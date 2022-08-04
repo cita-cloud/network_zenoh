@@ -223,7 +223,12 @@ pub async fn zenoh_serve(
                     msg.origin = config.get_node_origin();
                     let mut dst = BytesMut::new();
                     msg.encode(&mut dst).unwrap();
-                    session.put(expr_id, &*dst).await.unwrap();
+                    session
+                        .put(expr_id, &*dst)
+                        .congestion_control(zenoh::publication::CongestionControl::Block)
+                        .priority(Priority::RealTime)
+                        .await
+                        .unwrap();
                 }
                 Err(e) => debug!("outbound_msg_rx: {e}"),
             },
