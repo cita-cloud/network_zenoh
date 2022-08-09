@@ -223,10 +223,19 @@ pub async fn zenoh_serve(
                     msg.origin = config.get_node_origin();
                     let mut dst = BytesMut::new();
                     msg.encode(&mut dst).unwrap();
+                    let priority = match msg.r#type.as_str() {
+                        "send_tx" => Priority::Data,
+                        "send_txs" => Priority::Data,
+                        "sync_block" => Priority::Data,
+                        "chain_status_respond" => Priority::InteractiveLow,
+                        "sync_block_respond" => Priority::InteractiveLow,
+                        "sync_tx_respond" => Priority::InteractiveLow,
+                        _ => Priority::DataHigh,
+                    };
                     session
                         .put(expr_id, &*dst)
                         .congestion_control(zenoh::publication::CongestionControl::Block)
-                        .priority(Priority::RealTime)
+                        .priority(priority)
                         .await
                         .unwrap();
                 }
