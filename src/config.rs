@@ -76,6 +76,12 @@ pub struct NetworkConfig {
     pub modules: Vec<ModuleConfig>,
     /// health check timeout
     pub health_check_timeout: u64,
+    // Receiving buffer size in bytes for each link
+    // The default the rx_buffer_size value is the same as the default batch size: 65335.
+    // For very high throughput scenarios, the rx_buffer_size can be increased to accomoda
+    // more in-flight data. This is particularly relevant when dealing with large messages
+    // E.g. for 16MiB rx_buffer_size set the value to: 16777216.
+    pub rx_buffer_size: usize,
 }
 
 impl NetworkConfig {
@@ -127,6 +133,7 @@ impl Default for NetworkConfig {
             hot_update_interval: 60,
             modules: vec![],
             health_check_timeout: 300,
+            rx_buffer_size: 16777216,
         }
     }
 }
