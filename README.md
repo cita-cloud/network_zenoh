@@ -65,6 +65,9 @@ OPTIONS:
     * `node_address` 节点地址
     * `validator_address` 共识地址
     * `modules` 为同节点的其它微服务网络信息，其中`module_name`字段为模块名称，`port`字段为该微服务的grpc端口号，`hostname`字段为该微服务的网络地址。
+    * `hot_update_interval` 节点配置热更新间隔时间（以秒为单位）
+    * `health_check_timeout` 健康检查超时时间（以秒为单位）
+    * `rx_buffer_size` 每个链接的接收缓冲区大小（以字节为单位）
 
 2. 日志配置文件。
 
