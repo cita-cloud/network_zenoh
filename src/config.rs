@@ -82,6 +82,12 @@ pub struct NetworkConfig {
     pub metrics_port: u16,
     /// metrics histogram buckets
     pub metrics_buckets: Vec<f64>,
+    // Receiving buffer size in bytes for each link
+    // The default the rx_buffer_size value is the same as the default batch size: 65335.
+    // For very high throughput scenarios, the rx_buffer_size can be increased to accomoda
+    // more in-flight data. This is particularly relevant when dealing with large messages
+    // E.g. for 16MiB rx_buffer_size set the value to: 16777216.
+    pub rx_buffer_size: usize,
 }
 
 impl NetworkConfig {
@@ -138,6 +144,7 @@ impl Default for NetworkConfig {
             metrics_buckets: vec![
                 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0, 25.0, 50.0, 75.0, 100.0, 250.0, 500.0,
             ],
+            rx_buffer_size: 16777216,
         }
     }
 }

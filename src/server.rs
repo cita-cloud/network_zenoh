@@ -95,15 +95,11 @@ pub async fn zenoh_serve(
         .unwrap();
 
     // Receiving buffer size in bytes for each link
-    // The default the rx_buffer_size value is the same as the default batch size: 65335.
-    // For very high throughput scenarios, the rx_buffer_size can be increased to accomoda
-    // more in-flight data. This is particularly relevant when dealing with large messages
-    // E.g. for 16MiB rx_buffer_size set the value to: 16777216.
     zenoh_config
         .transport
         .link
         .rx
-        .set_buffer_size(Some(16777216))
+        .set_buffer_size(Some(config.rx_buffer_size))
         .unwrap();
 
     // the shared-memory transport will be disabled.
@@ -223,7 +219,21 @@ pub async fn zenoh_serve(
                     msg.origin = config.get_node_origin();
                     let mut dst = BytesMut::new();
                     msg.encode(&mut dst).unwrap();
-                    session.put(expr_id, &*dst).await.unwrap();
+                    let priority = match msg.r#type.as_str() {
+                        "send_tx" => Priority::Data,
+                        "send_txs" => Priority::Data,
+                        "sync_block" => Priority::Data,
+                        "chain_status_respond" => Priority::InteractiveLow,
+                        "sync_block_respond" => Priority::InteractiveLow,
+                        "sync_tx_respond" => Priority::InteractiveLow,
+                        _ => Priority::DataHigh,
+                    };
+                    session
+                        .put(expr_id, &*dst)
+                        .congestion_control(zenoh::publication::CongestionControl::Block)
+                        .priority(priority)
+                        .await
+                        .unwrap();
                 }
                 Err(e) => debug!("outbound_msg_rx: {e}"),
             },
