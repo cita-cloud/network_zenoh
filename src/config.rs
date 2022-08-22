@@ -76,6 +76,12 @@ pub struct NetworkConfig {
     pub modules: Vec<ModuleConfig>,
     /// health check timeout
     pub health_check_timeout: u64,
+    /// enable metrics or not
+    pub enable_metrics: bool,
+    /// metrics exporter port
+    pub metrics_port: u16,
+    /// metrics histogram buckets
+    pub metrics_buckets: Vec<f64>,
     // Receiving buffer size in bytes for each link
     // The default the rx_buffer_size value is the same as the default batch size: 65335.
     // For very high throughput scenarios, the rx_buffer_size can be increased to accomoda
@@ -133,6 +139,11 @@ impl Default for NetworkConfig {
             hot_update_interval: 60,
             modules: vec![],
             health_check_timeout: 300,
+            enable_metrics: true,
+            metrics_port: 60000,
+            metrics_buckets: vec![
+                0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0, 25.0, 50.0, 75.0, 100.0, 250.0, 500.0,
+            ],
             rx_buffer_size: 16777216,
         }
     }

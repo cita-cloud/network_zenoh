@@ -22,23 +22,22 @@ mod peer;
 mod server;
 mod util;
 
-use std::{collections::HashMap, sync::Arc};
-
-use cita_cloud_proto::{
-    client::ClientOptions, health_check::health_server::HealthServer,
-    network::network_service_server::NetworkServiceServer,
-};
-use clap::Parser;
-use flume::unbounded;
-use log::info;
-use panic_hook::set_panic_handler;
-use parking_lot::RwLock;
-
 use crate::{
     config::NetworkConfig, dispatcher::NetworkMsgDispatcher,
     grpc_server::CitaCloudNetworkServiceServer, health_check::HealthCheckServer, peer::PeersManger,
     server::zenoh_serve,
 };
+use cita_cloud_proto::{
+    client::ClientOptions, health_check::health_server::HealthServer,
+    network::network_service_server::NetworkServiceServer,
+};
+use clap::Parser;
+use cloud_util::metrics::{run_metrics_exporter, MiddlewareLayer};
+use flume::unbounded;
+use log::info;
+use panic_hook::set_panic_handler;
+use parking_lot::RwLock;
+use std::{collections::HashMap, sync::Arc};
 
 const CLIENT_NAME: &str = "network";
 
@@ -92,9 +91,9 @@ async fn run(opts: RunOpts) {
     log4rs::init_file(&opts.log_file, Default::default())
         .map_err(|e| println!("log init err: {}", e))
         .unwrap();
-    info!("start network zenoh");
+
     let grpc_port = config.grpc_port.to_string();
-    info!("grpc port of this service: {}", &grpc_port);
+    info!("grpc port of network_zenoh: {}", &grpc_port);
 
     // inbound_msg
     let (inbound_msg_tx, inbound_msg_rx) = unbounded();
@@ -143,17 +142,51 @@ async fn run(opts: RunOpts) {
     let network_svc_hot_update = network_svc.clone();
     let grpc_addr = format!("0.0.0.0:{}", grpc_port).parse().unwrap();
     let peers_for_health_check = peers.clone();
-    tokio::spawn(async move {
-        tonic::transport::Server::builder()
-            .add_service(NetworkServiceServer::new(network_svc))
-            .add_service(HealthServer::new(HealthCheckServer::new(
-                peers_for_health_check,
-                config.health_check_timeout,
-            )))
-            .serve(grpc_addr)
-            .await
-            .unwrap();
-    });
+
+    // add layer if metrics is enabled
+    let layer = if config.enable_metrics {
+        tokio::spawn(async move {
+            run_metrics_exporter(config.metrics_port).await.unwrap();
+        });
+
+        Some(
+            tower::ServiceBuilder::new()
+                .layer(MiddlewareLayer::new(config.metrics_buckets))
+                .into_inner(),
+        )
+    } else {
+        None
+    };
+
+    info!("start network_zenoh grpc server!");
+    if layer.is_some() {
+        info!("metrics on");
+        tokio::spawn(async move {
+            tonic::transport::Server::builder()
+                .layer(layer.unwrap())
+                .add_service(NetworkServiceServer::new(network_svc))
+                .add_service(HealthServer::new(HealthCheckServer::new(
+                    peers_for_health_check,
+                    config.health_check_timeout,
+                )))
+                .serve(grpc_addr)
+                .await
+                .unwrap();
+        });
+    } else {
+        info!("metrics off");
+        tokio::spawn(async move {
+            tonic::transport::Server::builder()
+                .add_service(NetworkServiceServer::new(network_svc))
+                .add_service(HealthServer::new(HealthCheckServer::new(
+                    peers_for_health_check,
+                    config.health_check_timeout,
+                )))
+                .serve(grpc_addr)
+                .await
+                .unwrap();
+        });
+    }
 
     // run zenoh instance
     zenoh_serve(
