@@ -84,6 +84,8 @@ struct RunOpts {
 async fn run(opts: RunOpts) {
     ::std::env::set_var("RUST_BACKTRACE", "full");
 
+    tokio::spawn(cloud_util::signal::handle_signals());
+
     // read config.toml
     let config = NetworkConfig::new(&opts.config_path);
 
