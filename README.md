@@ -62,8 +62,8 @@ OPTIONS:
     * `port` 为`zenoh`服务监听端口
     * `peers` 为`zenoh`邻居节点的网络信息，其中`protocol`字段为服务协议类型，`port`字段为端口号，`domain`字段为该邻居节点申请证书时使用的域名。
     * `chain_id` 链的唯一标识
-    * `node_address` 节点地址
-    * `validator_address` 共识地址
+    * `node_address` 节点地址文件路径
+    * `validator_address` 共识节点地址文件路径
     * `modules` 为同节点的其它微服务网络信息，其中`module_name`字段为模块名称，`port`字段为该微服务的grpc端口号，`hostname`字段为该微服务的网络地址。
     * `hot_update_interval` 节点配置热更新间隔时间（以秒为单位）
     * `health_check_timeout` 健康检查超时时间（以秒为单位）

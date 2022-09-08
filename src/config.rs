@@ -14,6 +14,7 @@
 
 use cloud_util::common::read_toml;
 use serde::{Deserialize, Serialize};
+use std::fs;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PeerConfig {
@@ -54,9 +55,9 @@ pub struct NetworkConfig {
     pub priv_key: String,
     // peers net config info
     pub peers: Vec<PeerConfig>,
-    // node address
+    // node address file path
     pub node_address: String,
-    // validator address
+    // validator address file path
     pub validator_address: String,
     // chain id
     pub chain_id: String,
@@ -92,7 +93,12 @@ pub struct NetworkConfig {
 
 impl NetworkConfig {
     pub fn new(config_str: &str) -> Self {
-        read_toml(config_str, "network_zenoh")
+        let mut config: NetworkConfig = read_toml(config_str, "network_zenoh");
+        let node_address_path = config.node_address.clone();
+        let validator_address_path = config.validator_address.clone();
+        config.node_address = fs::read_to_string(node_address_path).unwrap();
+        config.validator_address = fs::read_to_string(validator_address_path).unwrap();
+        config
     }
     pub fn get_address(&self) -> String {
         format!("{}/{}:{}", self.protocol, self.domain, self.port)
@@ -146,5 +152,32 @@ impl Default for NetworkConfig {
             ],
             rx_buffer_size: 16777216,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::NetworkConfig;
+
+    #[test]
+    fn basic_test() {
+        let config = NetworkConfig::new("example/config.toml");
+
+        assert_eq!(
+            config.chain_id,
+            "63586a3c0255f337c77a777ff54f0040b8c388da04f23ecee6bfd4953a6512b4"
+        );
+        assert_eq!(config.domain, "test-chain-0");
+        assert_eq!(config.grpc_port, 50000);
+        assert_eq!(config.metrics_port, 60000);
+        assert_eq!(config.port, 40000);
+        assert_eq!(
+            config.node_address,
+            "c356876e7f4831476f99ea0593b0cd7a6053e4d3".to_string()
+        );
+        assert_eq!(
+            config.validator_address,
+            "c356876e7f4831476f99ea0593b0cd7a6053e4d3".to_string()
+        );
     }
 }
