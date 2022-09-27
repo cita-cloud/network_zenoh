@@ -13,19 +13,23 @@
 // limitations under the License.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use cita_cloud_proto::client::{InterceptedSvc, NetworkMsgHandlerServiceClientTrait};
 use cita_cloud_proto::network::{
     network_msg_handler_service_client::NetworkMsgHandlerServiceClient, NetworkMsg,
 };
 use cita_cloud_proto::retry::RetryClient;
+use cloud_util::unix_now;
 use flume::Receiver;
-use log::warn;
+use log::{debug, warn};
+use parking_lot::RwLock;
 
 pub struct NetworkMsgDispatcher {
     pub inbound_msg_rx: Receiver<NetworkMsg>,
     pub dispatch_table:
         HashMap<String, RetryClient<NetworkMsgHandlerServiceClient<InterceptedSvc>>>,
+    pub send_msg_check: Arc<RwLock<u64>>,
 }
 
 impl NetworkMsgDispatcher {
@@ -43,6 +47,9 @@ impl NetworkMsgDispatcher {
                         );
                     }
                 });
+            } else if msg.module == "HEALTH_CHECK" {
+                *self.send_msg_check.write() = unix_now();
+                debug!("Recycle the HEALTH_CHECK msg sent by self: {:?}", &msg);
             } else {
                 warn!(
                     "Unknown module, will drop msg: msg.module {} msg.origin {}",

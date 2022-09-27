@@ -154,6 +154,7 @@ pub async fn zenoh_serve(
 
     // open zenoh session
     let session = zenoh::open(zenoh_config).await.unwrap();
+
     // node subscriber
     let inbound_msg_tx = network_svc.inbound_msg_tx.clone();
     let _node_subscriber = session
@@ -183,8 +184,9 @@ pub async fn zenoh_serve(
         .best_effort()
         .wait()
         .unwrap();
-    let _validator_subscriber;
+
     // When the controller (node) address is the same as the consensus address, simply subscribe to the controller (node) address
+    let _validator_subscriber;
     if config.get_node_origin() != config.get_validator_origin() {
         debug!("------ (node_origin != validator_origin)");
         let inbound_msg_tx = network_svc.inbound_msg_tx.clone();
@@ -202,11 +204,30 @@ pub async fn zenoh_serve(
             .unwrap();
     }
 
+    // send_msg_check subscriber
+    let outbound_msg_tx = network_svc.outbound_msg_tx.clone();
+    let _check_forward_subscriber = session
+        .subscribe(format!("{}-check", config.get_chain_origin()))
+        .callback(move |sample| {
+            let mut msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
+                .map_err(|e| error!("{e}"))
+                .unwrap();
+            msg.origin = u64::from_be_bytes(msg.msg[..8].try_into().unwrap());
+            let _ = outbound_msg_tx.send(msg);
+        })
+        .best_effort()
+        .wait()
+        .unwrap();
+
     let mut config_md5 = calculate_md5(&config_path).unwrap();
     debug!("config file initial md5: {:x}", config_md5);
 
     let mut hot_update_interval =
         tokio::time::interval(tokio::time::Duration::from_secs(config.hot_update_interval));
+
+    let mut health_check_interval = tokio::time::interval(tokio::time::Duration::from_secs(
+        config.health_check_interval,
+    ));
 
     loop {
         tokio::select! {
@@ -238,7 +259,19 @@ pub async fn zenoh_serve(
                 Err(e) => debug!("outbound_msg_rx: {e}"),
             },
             // hot update
-             _ = hot_update_interval.tick() => {
+            _ = hot_update_interval.tick() => {
+                if let Ok(new_md5) = calculate_md5(&config_path) {
+                    if new_md5 != config_md5 {
+                        info!("config file new md5: {:x}", new_md5);
+                        config_md5 = new_md5;
+                        try_hot_update(config_path, network_svc.peers.clone(), session.config()).await;
+                    }
+                } else {
+                    warn!("calculate config file md5 failed, make sure it's not removed");
+                };
+            },
+            // health check
+            _ = health_check_interval.tick() => {
                 // update connected peers
                 let endpoints: Vec<EndPoint> = session
                     .config()
@@ -258,16 +291,23 @@ pub async fn zenoh_serve(
                     peers.set_connected_peers(connected_peers);
                 }
 
-                // hot update
-                if let Ok(new_md5) = calculate_md5(&config_path) {
-                    if new_md5 != config_md5 {
-                        info!("config file new md5: {:x}", new_md5);
-                        config_md5 = new_md5;
-                        try_hot_update(config_path, network_svc.peers.clone(), session.config()).await;
-                    }
-                } else {
-                    warn!("calculate config file md5 failed, make sure it's not removed");
+                // send msg check
+                let msg = NetworkMsg {
+                    module: "HEALTH_CHECK".to_string(),
+                    r#type: "HEALTH_CHECK".to_string(),
+                    origin: config.get_node_origin(),
+                    msg: config.get_node_origin().to_be_bytes().to_vec()
                 };
+                let expr_id = session.declare_expr(format!("{}-check", config.get_chain_origin())).await.unwrap();
+                session.declare_publication(expr_id).await.unwrap();
+                let mut dst = BytesMut::new();
+                msg.encode(&mut dst).unwrap();
+                session
+                    .put(expr_id, &*dst)
+                    .congestion_control(zenoh::publication::CongestionControl::Block)
+                    .priority(Priority::DataHigh)
+                    .await
+                    .unwrap();
             },
             else => {
                 debug!("network stopped!");

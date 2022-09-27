@@ -16,6 +16,8 @@ use cloud_util::common::read_toml;
 use serde::{Deserialize, Serialize};
 use std::fs;
 
+use crate::util::to_u64;
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct PeerConfig {
     pub protocol: String,
@@ -75,6 +77,8 @@ pub struct NetworkConfig {
     pub hot_update_interval: u64,
     // modules config info
     pub modules: Vec<ModuleConfig>,
+    /// health check interval, in senconds
+    pub health_check_interval: u64,
     /// health check timeout
     pub health_check_timeout: u64,
     /// enable metrics or not
@@ -104,22 +108,13 @@ impl NetworkConfig {
         format!("{}/{}:{}", self.protocol, self.domain, self.port)
     }
     pub fn get_node_origin(&self) -> u64 {
-        let tmp = &self.node_address[0..16];
-        let mut decoded = [0; 8];
-        hex::decode_to_slice(tmp, &mut decoded).unwrap();
-        u64::from_be_bytes(decoded)
+        to_u64(&self.node_address[0..16])
     }
     pub fn get_validator_origin(&self) -> u64 {
-        let tmp = &self.validator_address[0..16];
-        let mut decoded = [0; 8];
-        hex::decode_to_slice(tmp, &mut decoded).unwrap();
-        u64::from_be_bytes(decoded)
+        to_u64(&self.validator_address[0..16])
     }
     pub fn get_chain_origin(&self) -> u64 {
-        let tmp = &self.chain_id[0..16];
-        let mut decoded = [0; 8];
-        hex::decode_to_slice(tmp, &mut decoded).unwrap();
-        u64::from_be_bytes(decoded)
+        to_u64(&self.chain_id[0..16])
     }
 }
 
@@ -144,6 +139,7 @@ impl Default for NetworkConfig {
             keep_alive: 4,
             hot_update_interval: 60,
             modules: vec![],
+            health_check_interval: 120,
             health_check_timeout: 300,
             enable_metrics: true,
             metrics_port: 60000,

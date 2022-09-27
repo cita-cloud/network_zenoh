@@ -31,13 +31,19 @@ use crate::peer::PeersManger;
 pub struct HealthCheckServer {
     peers: Arc<RwLock<PeersManger>>,
     timestamp: AtomicU64,
+    send_msg_check: Arc<RwLock<u64>>,
     timeout: u64,
 }
 
 impl HealthCheckServer {
-    pub fn new(peers: Arc<RwLock<PeersManger>>, timeout: u64) -> Self {
+    pub fn new(
+        peers: Arc<RwLock<PeersManger>>,
+        send_msg_check: Arc<RwLock<u64>>,
+        timeout: u64,
+    ) -> Self {
         HealthCheckServer {
             peers,
+            send_msg_check,
             timestamp: AtomicU64::new(unix_now()),
             timeout,
         }
@@ -51,21 +57,19 @@ impl Health for HealthCheckServer {
         _request: Request<HealthCheckRequest>,
     ) -> Result<Response<HealthCheckResponse>, Status> {
         let timestamp = unix_now();
-        let old_timestamp = self.timestamp.load(Ordering::Relaxed);
-        let peer_count;
-        {
-            peer_count = self.peers.read().get_connected_peers().len() as u64;
-        }
-        let status = if peer_count > 0 {
+        let peer_count = self.peers.read().get_connected_peers().len() as u64;
+
+        if peer_count > 0 {
             self.timestamp.store(timestamp, Ordering::Relaxed);
-            ServingStatus::Serving.into()
-        } else {
+        }
+        let old_timestamp = self.timestamp.load(Ordering::Relaxed);
+        let send_check_timeout = timestamp - *self.send_msg_check.read();
+        let timeout = self.timeout * 1000;
+        let status = if timestamp - old_timestamp > timeout || send_check_timeout > timeout {
             // peer is offline for a long time
-            if timestamp - old_timestamp > self.timeout * 1000 {
-                ServingStatus::NotServing.into()
-            } else {
-                ServingStatus::Serving.into()
-            }
+            ServingStatus::NotServing.into()
+        } else {
+            ServingStatus::Serving.into()
         };
 
         let reply = Response::new(HealthCheckResponse { status });
