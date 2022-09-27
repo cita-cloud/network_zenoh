@@ -33,6 +33,7 @@ use cita_cloud_proto::{
 };
 use clap::Parser;
 use cloud_util::metrics::{run_metrics_exporter, MiddlewareLayer};
+use cloud_util::unix_now;
 use flume::unbounded;
 use log::info;
 use panic_hook::set_panic_handler;
@@ -138,12 +139,15 @@ async fn run(opts: RunOpts) {
         dispatch_table,
         peers: peers.clone(),
         inbound_msg_tx: inbound_msg_tx.clone(),
-        outbound_msg_tx,
+        outbound_msg_tx: outbound_msg_tx.clone(),
         chain_origin: config.get_chain_origin(),
     };
     let network_svc_hot_update = network_svc.clone();
     let grpc_addr = format!("0.0.0.0:{}", grpc_port).parse().unwrap();
     let peers_for_health_check = peers.clone();
+
+    let send_msg_check = Arc::new(RwLock::new(unix_now()));
+    let send_msg_check_ = send_msg_check.clone();
 
     // add layer if metrics is enabled
     let layer = if config.enable_metrics {
@@ -169,6 +173,7 @@ async fn run(opts: RunOpts) {
                 .add_service(NetworkServiceServer::new(network_svc))
                 .add_service(HealthServer::new(HealthCheckServer::new(
                     peers_for_health_check,
+                    send_msg_check_,
                     config.health_check_timeout,
                 )))
                 .serve(grpc_addr)
@@ -182,6 +187,7 @@ async fn run(opts: RunOpts) {
                 .add_service(NetworkServiceServer::new(network_svc))
                 .add_service(HealthServer::new(HealthCheckServer::new(
                     peers_for_health_check,
+                    send_msg_check_,
                     config.health_check_timeout,
                 )))
                 .serve(grpc_addr)
@@ -196,6 +202,7 @@ async fn run(opts: RunOpts) {
         &opts.config_path,
         network_svc_hot_update,
         outbound_msg_rx,
+        send_msg_check,
     )
     .await
 }

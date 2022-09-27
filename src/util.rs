@@ -77,3 +77,9 @@ pub fn calculate_md5(path: impl AsRef<Path>) -> Result<Digest, Error> {
         Err(e) => Err(e),
     }
 }
+
+pub fn to_u64(tmp: &str) -> u64 {
+    let mut decoded = [0; 8];
+    hex::decode_to_slice(tmp, &mut decoded).unwrap();
+    u64::from_be_bytes(decoded)
+}
