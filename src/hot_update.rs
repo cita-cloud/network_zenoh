@@ -29,7 +29,7 @@ use crate::{
 pub async fn try_hot_update(
     path: &str,
     peers: Arc<RwLock<PeersManger>>,
-    zenoh_config: &mut Notifier<Config>,
+    mut zenoh_config: &Notifier<Config>,
 ) {
     let new_config = NetworkConfig::new(path);
     let known_peers;
