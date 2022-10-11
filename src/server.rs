@@ -145,10 +145,12 @@ pub async fn zenoh_serve(
     // open zenoh session
     let session = zenoh::open(zenoh_config).res().await.unwrap();
 
+    let self_node_origin = config.get_node_origin();
+
     // node subscriber
     let inbound_msg_tx = network_svc.inbound_msg_tx.clone();
     let _node_subscriber = session
-        .declare_subscriber(config.get_node_origin().to_string())
+        .declare_subscriber(self_node_origin.to_string())
         .callback(move |sample| {
             let msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
                 .map_err(|e| error!("{e}"))
@@ -169,8 +171,10 @@ pub async fn zenoh_serve(
             let msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
                 .map_err(|e| error!("{e}"))
                 .unwrap();
-            debug!("inbound msg chain: {:?}", &msg);
-            inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
+            if msg.origin != self_node_origin {
+                debug!("inbound msg chain: {:?}", &msg);
+                inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
+            }
         })
         .best_effort()
         .res()
@@ -179,7 +183,7 @@ pub async fn zenoh_serve(
 
     // When the controller (node) address is the same as the consensus address, simply subscribe to the controller (node) address
     let _validator_subscriber;
-    if config.get_node_origin() != config.get_validator_origin() {
+    if self_node_origin != config.get_validator_origin() {
         debug!("------ (node_origin != validator_origin)");
         let inbound_msg_tx = network_svc.inbound_msg_tx.clone();
         _validator_subscriber = session
@@ -188,8 +192,10 @@ pub async fn zenoh_serve(
                 let msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
                     .map_err(|e| error!("{e}"))
                     .unwrap();
-                debug!("inbound msg validator: {:?}", &msg);
-                inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
+                if msg.origin != self_node_origin {
+                    debug!("inbound msg validator: {:?}", &msg);
+                    inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
+                }
             })
             .best_effort()
             .res()
@@ -205,8 +211,10 @@ pub async fn zenoh_serve(
             let mut msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
                 .map_err(|e| error!("{e}"))
                 .unwrap();
-            msg.origin = u64::from_be_bytes(msg.msg[..8].try_into().unwrap());
-            let _ = outbound_msg_tx.send(msg);
+            if msg.origin != self_node_origin {
+                msg.origin = u64::from_be_bytes(msg.msg[..8].try_into().unwrap());
+                let _ = outbound_msg_tx.send(msg);
+            }
         })
         .best_effort()
         .res()
@@ -245,7 +253,7 @@ pub async fn zenoh_serve(
                         .res()
                         .await
                         .unwrap();
-                    msg.origin = config.get_node_origin();
+                    msg.origin = self_node_origin;
                     let mut dst = BytesMut::new();
                     msg.encode(&mut dst).unwrap();
                     publisher
@@ -293,8 +301,8 @@ pub async fn zenoh_serve(
                 let msg = NetworkMsg {
                     module: "HEALTH_CHECK".to_string(),
                     r#type: "HEALTH_CHECK".to_string(),
-                    origin: config.get_node_origin(),
-                    msg: config.get_node_origin().to_be_bytes().to_vec()
+                    origin: self_node_origin,
+                    msg: self_node_origin.to_be_bytes().to_vec()
                 };
                 let publisher = session
                     .declare_publisher(format!("{}-check", config.get_chain_origin()))
