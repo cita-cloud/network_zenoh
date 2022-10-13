@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, str::FromStr, sync::Arc};
 
 use bytes::BytesMut;
 use cita_cloud_proto::network::NetworkMsg;
 use log::{debug, error, info, warn};
 use parking_lot::RwLock;
 use prost::Message;
+use r#async::AsyncResolve;
 use util::write_to_file;
 use zenoh::{
-    config::{EndPoint, QoSConf, WhatAmI},
+    config::{EndPoint, QoSConf},
     prelude::*,
 };
 
@@ -46,30 +47,19 @@ pub async fn zenoh_serve(
 
     // Set the chain_id to the zenoh instance id
     zenoh_config
-        .set_id(Some(config.node_address[0..16].to_string()))
-        .unwrap();
-
-    // Whether local writes/queries should reach local subscribers/queryables.
-    zenoh_config
-        .set_local_routing(Some(config.local_routing))
-        .unwrap();
-
-    // If set to false, peers will never automatically establish sessions between each-other.
-    zenoh_config
-        .scouting
-        .set_peers_autoconnect(Some(config.peers_autoconnect))
-        .unwrap();
-
-    zenoh_config
-        .scouting
-        .multicast
-        .set_enabled(Some(false))
+        .set_id(ZenohId::from_str(&config.node_address[0..16]).unwrap())
         .unwrap();
 
     zenoh_config
         .scouting
         .gossip
-        .set_autoconnect(Some(WhatAmI::Peer | WhatAmI::Router))
+        .set_enabled(Some(config.scouting))
+        .unwrap();
+
+    zenoh_config
+        .scouting
+        .multicast
+        .set_enabled(Some(config.scouting))
         .unwrap();
 
     // QoS
@@ -153,12 +143,14 @@ pub async fn zenoh_serve(
         .unwrap();
 
     // open zenoh session
-    let session = zenoh::open(zenoh_config).await.unwrap();
+    let session = zenoh::open(zenoh_config).res().await.unwrap();
+
+    let self_node_origin = config.get_node_origin();
 
     // node subscriber
     let inbound_msg_tx = network_svc.inbound_msg_tx.clone();
     let _node_subscriber = session
-        .subscribe(config.get_node_origin().to_string())
+        .declare_subscriber(self_node_origin.to_string())
         .callback(move |sample| {
             let msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
                 .map_err(|e| error!("{e}"))
@@ -167,56 +159,66 @@ pub async fn zenoh_serve(
             inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
         })
         .best_effort()
-        .wait()
+        .res()
+        .await
         .unwrap();
 
     // chain subscriber
     let inbound_msg_tx = network_svc.inbound_msg_tx.clone();
     let _chain_subscriber = session
-        .subscribe(config.get_chain_origin().to_string())
+        .declare_subscriber(config.get_chain_origin().to_string())
         .callback(move |sample| {
             let msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
                 .map_err(|e| error!("{e}"))
                 .unwrap();
-            debug!("inbound msg chain: {:?}", &msg);
-            inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
+            if msg.origin != self_node_origin {
+                debug!("inbound msg chain: {:?}", &msg);
+                inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
+            }
         })
         .best_effort()
-        .wait()
+        .res()
+        .await
         .unwrap();
 
     // When the controller (node) address is the same as the consensus address, simply subscribe to the controller (node) address
     let _validator_subscriber;
-    if config.get_node_origin() != config.get_validator_origin() {
+    if self_node_origin != config.get_validator_origin() {
         debug!("------ (node_origin != validator_origin)");
         let inbound_msg_tx = network_svc.inbound_msg_tx.clone();
         _validator_subscriber = session
-            .subscribe(config.get_validator_origin().to_string())
+            .declare_subscriber(config.get_validator_origin().to_string())
             .callback(move |sample| {
                 let msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
                     .map_err(|e| error!("{e}"))
                     .unwrap();
-                debug!("inbound msg validator: {:?}", &msg);
-                inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
+                if msg.origin != self_node_origin {
+                    debug!("inbound msg validator: {:?}", &msg);
+                    inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
+                }
             })
             .best_effort()
-            .wait()
+            .res()
+            .await
             .unwrap();
     }
 
     // send_msg_check subscriber
     let outbound_msg_tx = network_svc.outbound_msg_tx.clone();
     let _check_forward_subscriber = session
-        .subscribe(format!("{}-check", config.get_chain_origin()))
+        .declare_subscriber(format!("{}-check", config.get_chain_origin()))
         .callback(move |sample| {
             let mut msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
                 .map_err(|e| error!("{e}"))
                 .unwrap();
-            msg.origin = u64::from_be_bytes(msg.msg[..8].try_into().unwrap());
-            let _ = outbound_msg_tx.send(msg);
+            if msg.origin != self_node_origin {
+                msg.origin = u64::from_be_bytes(msg.msg[..8].try_into().unwrap());
+                let _ = outbound_msg_tx.send(msg);
+            }
         })
         .best_effort()
-        .wait()
+        .res()
+        .await
         .unwrap();
 
     let mut config_md5 = calculate_md5(&config_path).unwrap();
@@ -235,11 +237,6 @@ pub async fn zenoh_serve(
             outbound_msg = outbound_msg_rx.recv_async() => match outbound_msg {
                 Ok(mut msg) => {
                     debug!("outbound msg: {:?}", &msg);
-                    let expr_id = session.declare_expr(&msg.origin.to_string()).await.unwrap();
-                    session.declare_publication(expr_id).await.unwrap();
-                    msg.origin = config.get_node_origin();
-                    let mut dst = BytesMut::new();
-                    msg.encode(&mut dst).unwrap();
                     let priority = match msg.r#type.as_str() {
                         "send_tx" => Priority::Data,
                         "send_txs" => Priority::Data,
@@ -249,10 +246,19 @@ pub async fn zenoh_serve(
                         "sync_tx_respond" => Priority::InteractiveLow,
                         _ => Priority::DataHigh,
                     };
-                    session
-                        .put(expr_id, &*dst)
+                    let publisher = session
+                        .declare_publisher(msg.origin.to_string())
                         .congestion_control(zenoh::publication::CongestionControl::Block)
                         .priority(priority)
+                        .res()
+                        .await
+                        .unwrap();
+                    msg.origin = self_node_origin;
+                    let mut dst = BytesMut::new();
+                    msg.encode(&mut dst).unwrap();
+                    publisher
+                        .put(&*dst)
+                        .res()
                         .await
                         .unwrap();
                 }
@@ -295,17 +301,21 @@ pub async fn zenoh_serve(
                 let msg = NetworkMsg {
                     module: "HEALTH_CHECK".to_string(),
                     r#type: "HEALTH_CHECK".to_string(),
-                    origin: config.get_node_origin(),
-                    msg: config.get_node_origin().to_be_bytes().to_vec()
+                    origin: self_node_origin,
+                    msg: self_node_origin.to_be_bytes().to_vec()
                 };
-                let expr_id = session.declare_expr(format!("{}-check", config.get_chain_origin())).await.unwrap();
-                session.declare_publication(expr_id).await.unwrap();
-                let mut dst = BytesMut::new();
-                msg.encode(&mut dst).unwrap();
-                session
-                    .put(expr_id, &*dst)
+                let publisher = session
+                    .declare_publisher(format!("{}-check", config.get_chain_origin()))
                     .congestion_control(zenoh::publication::CongestionControl::Block)
                     .priority(Priority::DataHigh)
+                    .res()
+                    .await
+                    .unwrap();
+                let mut dst = BytesMut::new();
+                msg.encode(&mut dst).unwrap();
+                publisher
+                    .put(&*dst)
+                    .res()
                     .await
                     .unwrap();
             },

@@ -67,8 +67,8 @@ pub struct NetworkConfig {
     pub qos: bool,
     // local_routing
     pub local_routing: bool,
-    // peers_autoconnect
-    pub peers_autoconnect: bool,
+    // scouting
+    pub scouting: bool,
     // Link lease duration in milliseconds (default: 10000)
     pub lease: u64,
     // Number fo keep-alive messages in a link lease duration (default: 4)
@@ -134,7 +134,7 @@ impl Default for NetworkConfig {
             chain_id: "".to_string(),
             qos: true,
             local_routing: false,
-            peers_autoconnect: false,
+            scouting: false,
             lease: 10000,
             keep_alive: 4,
             hot_update_interval: 60,
