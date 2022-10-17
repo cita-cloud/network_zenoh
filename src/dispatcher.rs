@@ -22,7 +22,7 @@ use cita_cloud_proto::network::{
 use cita_cloud_proto::retry::RetryClient;
 use cloud_util::unix_now;
 use flume::Receiver;
-use log::{debug, warn};
+use log::{info, warn};
 use parking_lot::RwLock;
 
 pub struct NetworkMsgDispatcher {
@@ -48,8 +48,13 @@ impl NetworkMsgDispatcher {
                     }
                 });
             } else if msg.module == "HEALTH_CHECK" {
-                *self.send_msg_check.write() = unix_now();
-                debug!("Recycle the HEALTH_CHECK msg sent by self: {:?}", &msg);
+                let now = unix_now();
+                *self.send_msg_check.write() = now;
+                info!(
+                    "Recycle the HEALTH_CHECK msg from: {:?}, by {}ms",
+                    &msg.origin,
+                    now - u64::from_be_bytes(msg.msg[8..16].try_into().unwrap())
+                );
             } else {
                 warn!(
                     "Unknown module, will drop msg: msg.module {} msg.origin {}",
