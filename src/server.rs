@@ -16,6 +16,7 @@ use std::{collections::HashSet, str::FromStr, sync::Arc};
 
 use bytes::BytesMut;
 use cita_cloud_proto::network::NetworkMsg;
+use cloud_util::unix_now;
 use log::{debug, error, info, warn};
 use parking_lot::RwLock;
 use prost::Message;
@@ -212,6 +213,11 @@ pub async fn zenoh_serve(
                 .map_err(|e| error!("{e}"))
                 .unwrap();
             if msg.origin != self_node_origin {
+                info!(
+                    "HEALTH_CHECK msg from: {}, sent at: {}",
+                    msg.origin,
+                    u64::from_be_bytes(msg.msg[8..16].try_into().unwrap())
+                );
                 msg.origin = u64::from_be_bytes(msg.msg[..8].try_into().unwrap());
                 let _ = outbound_msg_tx.send(msg);
             }
@@ -298,11 +304,14 @@ pub async fn zenoh_serve(
                 }
 
                 // send msg check
+                let now = unix_now();
+                let mut msg = self_node_origin.to_be_bytes().to_vec();
+                msg.append(&mut now.to_be_bytes().to_vec());
                 let msg = NetworkMsg {
                     module: "HEALTH_CHECK".to_string(),
                     r#type: "HEALTH_CHECK".to_string(),
                     origin: self_node_origin,
-                    msg: self_node_origin.to_be_bytes().to_vec()
+                    msg
                 };
                 let publisher = session
                     .declare_publisher(format!("{}-check", config.get_chain_origin()))
