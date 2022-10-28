@@ -1,6 +1,6 @@
 [package]
 name = "network"
-version = "6.6.1"
+version = "6.6.2"
 authors = ["Rivtower Technologies <contact@rivtower.com>"]
 edition = "2021"
 
@@ -19,11 +19,11 @@ tentacle-multiaddr = "0.3"
 clap = { version = "4.0", features = ["derive"] }
 backtrace = "0.3"
 log = "0.4"
-log4rs = { version = "1.1", features = ["gzip"] }
+log4rs = { version = "1.2", features = ["gzip"] }
 md5 = "0.7"
 json5 = "0.4"
-tonic = "0.7"
-prost = "0.10"
+tonic = "0.8"
+prost = "0.11"
 tower = "0.4"
 
 cloud-util = { git = "https://github.com/cita-cloud/cloud-util.git" }
