@@ -227,7 +227,7 @@ pub async fn zenoh_serve(
         .await
         .unwrap();
 
-    let mut config_md5 = calculate_md5(&config_path).unwrap();
+    let mut config_md5 = calculate_md5(config_path).unwrap();
     debug!("config file initial md5: {:x}", config_md5);
 
     let mut hot_update_interval =
@@ -272,7 +272,7 @@ pub async fn zenoh_serve(
             },
             // hot update
             _ = hot_update_interval.tick() => {
-                if let Ok(new_md5) = calculate_md5(&config_path) {
+                if let Ok(new_md5) = calculate_md5(config_path) {
                     if new_md5 != config_md5 {
                         info!("config file new md5: {:x}", new_md5);
                         config_md5 = new_md5;
