@@ -26,6 +26,5 @@ tonic = "0.8"
 prost = "0.11"
 tower = "0.4"
 
-cloud-util = { git = "https://github.com/cita-cloud/cloud-util.git" }
-cita_cloud_proto = { git = "https://github.com/cita-cloud/cita_cloud_proto.git" }
-status_code = { package = "cloud-code", git = "https://github.com/cita-cloud/status_code.git" }
+cloud-util = { package = "cloud-util", git = "https://github.com/cita-cloud/cloud-common-rs.git" }
+cita_cloud_proto = { package = "cita_cloud_proto", git = "https://github.com/cita-cloud/cloud-common-rs.git" }

@@ -19,6 +19,7 @@ use cita_cloud_proto::network::{
     network_service_server::NetworkService, NetworkMsg, NetworkStatusResponse, RegisterInfo,
 };
 use cita_cloud_proto::retry::RetryClient;
+use cita_cloud_proto::status_code::StatusCode as StatusCodeEnum;
 use flume::Sender;
 use log::{debug, error, info, warn};
 use parking_lot::RwLock;
@@ -53,7 +54,7 @@ impl NetworkService for CitaCloudNetworkServiceServer {
             .send_async(msg)
             .await
             .map_err(|e| error!("{e}"));
-        Ok(Response::new(status_code::StatusCode::Success.into()))
+        Ok(Response::new(StatusCodeEnum::Success.into()))
     }
 
     async fn broadcast(
@@ -69,7 +70,7 @@ impl NetworkService for CitaCloudNetworkServiceServer {
             .await
             .map_err(|e| error!("{e}"));
 
-        Ok(Response::new(status_code::StatusCode::Success.into()))
+        Ok(Response::new(StatusCodeEnum::Success.into()))
     }
 
     async fn get_network_status(
@@ -87,7 +88,7 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         &self,
         _request: Request<RegisterInfo>,
     ) -> Result<Response<StatusCode>, tonic::Status> {
-        Ok(Response::new(status_code::StatusCode::Success.into()))
+        Ok(Response::new(StatusCodeEnum::Success.into()))
     }
 
     async fn add_node(
@@ -102,14 +103,14 @@ impl NetworkService for CitaCloudNetworkServiceServer {
                 "parse_multiaddr: not a valid tls multi-address: {}",
                 &multiaddr
             );
-            Status::invalid_argument(status_code::StatusCode::MultiAddrParseError.to_string())
+            Status::invalid_argument(StatusCodeEnum::MultiAddrParseError.to_string())
         })?;
 
         let address = format!("quic/{}:{}", domain, port);
 
         let endpoint: zenoh::prelude::config::EndPoint = address.parse().map_err(|_| {
             warn!("parse_addr: not a valid address: {}", address);
-            Status::invalid_argument(status_code::StatusCode::MultiAddrParseError.to_string())
+            Status::invalid_argument(StatusCodeEnum::MultiAddrParseError.to_string())
         })?;
 
         let address = endpoint.locator.address();
@@ -119,13 +120,11 @@ impl NetworkService for CitaCloudNetworkServiceServer {
             let mut peers = self.peers.write();
             if peers.get_connected_peers().contains(&domain) {
                 //add a connected peer
-                return Ok(Response::new(
-                    status_code::StatusCode::AddExistedPeer.into(),
-                ));
+                return Ok(Response::new(StatusCodeEnum::AddExistedPeer.into()));
             }
             if peers.get_known_peers().contains_key(&domain) {
                 //add a known peer which is already trying to connect, return success
-                return Ok(Response::new(status_code::StatusCode::Success.into()));
+                return Ok(Response::new(StatusCodeEnum::Success.into()));
             }
 
             let peer = PeerConfig {
@@ -138,7 +137,7 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         }
         info!("peer added: {}", &address);
 
-        Ok(Response::new(status_code::StatusCode::Success.into()))
+        Ok(Response::new(StatusCodeEnum::Success.into()))
     }
 
     async fn get_peers_net_info(
