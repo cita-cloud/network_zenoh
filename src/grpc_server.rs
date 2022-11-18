@@ -19,7 +19,7 @@ use cita_cloud_proto::network::{
     network_service_server::NetworkService, NetworkMsg, NetworkStatusResponse, RegisterInfo,
 };
 use cita_cloud_proto::retry::RetryClient;
-use cita_cloud_proto::status_code::StatusCode as StatusCodeEnum;
+use cita_cloud_proto::status_code::StatusCodeEnum;
 use flume::Sender;
 use log::{debug, error, info, warn};
 use parking_lot::RwLock;
