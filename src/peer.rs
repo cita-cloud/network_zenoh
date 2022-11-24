@@ -20,25 +20,35 @@ use crate::config::PeerConfig;
 
 #[derive(Debug)]
 pub struct PeersManger {
-    known_peers: HashMap<String, PeerConfig>,
+    known_peers: HashMap<String, (u64, PeerConfig)>,
     connected_peers: HashSet<String>,
 }
 
 impl PeersManger {
-    pub fn new(known_peers: HashMap<String, PeerConfig>) -> Self {
+    pub fn new(known_peers: HashMap<String, (u64, PeerConfig)>) -> Self {
         Self {
             known_peers,
             connected_peers: HashSet::new(),
         }
     }
 
-    pub fn get_known_peers(&self) -> &HashMap<String, PeerConfig> {
+    pub fn get_known_peers(&self) -> &HashMap<String, (u64, PeerConfig)> {
         &self.known_peers
     }
 
-    pub fn add_known_peers(&mut self, domain: String, peer: PeerConfig) -> Option<PeerConfig> {
+    pub fn add_known_peers(
+        &mut self,
+        domain: String,
+        peer: (u64, PeerConfig),
+    ) -> Option<(u64, PeerConfig)> {
         debug!("add_from_config_peers: {}", domain);
         self.known_peers.insert(domain, peer)
+    }
+
+    pub fn update_known_peer_node_address(&mut self, domain: &str, origin: u64) {
+        if let Some((addr, _)) = self.known_peers.get_mut(domain) {
+            *addr = origin;
+        }
     }
 
     pub fn get_connected_peers(&self) -> &HashSet<String> {

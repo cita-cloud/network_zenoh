@@ -29,7 +29,7 @@ use tonic::{Request, Response, Status};
 
 use crate::config::PeerConfig;
 use crate::peer::PeersManger;
-use crate::util::parse_multiaddr;
+use crate::util::{build_multiaddr, parse_multiaddr};
 
 #[derive(Clone)]
 pub struct CitaCloudNetworkServiceServer {
@@ -118,7 +118,9 @@ impl NetworkService for CitaCloudNetworkServiceServer {
 
         {
             let mut peers = self.peers.write();
-            if peers.get_connected_peers().contains(&domain) {
+
+            let multiaddr = build_multiaddr("127.0.0.1", port, &domain);
+            if peers.get_connected_peers().contains(&multiaddr) {
                 //add a connected peer
                 return Ok(Response::new(StatusCodeEnum::AddExistedPeer.into()));
             }
@@ -133,7 +135,7 @@ impl NetworkService for CitaCloudNetworkServiceServer {
                 port,
             };
 
-            peers.add_known_peers(domain, peer);
+            peers.add_known_peers(domain, (0, peer));
         }
         info!("peer added: {}", &address);
 
@@ -150,10 +152,14 @@ impl NetworkService for CitaCloudNetworkServiceServer {
             peers = self.peers.read().get_connected_peers().clone();
         }
         for addr in peers.iter() {
-            node_infos.push(NodeNetInfo {
-                multi_address: addr.to_string(),
-                origin: 0,
-            });
+            if let Some((_, _, domain)) = parse_multiaddr(addr) {
+                if let Some((origin, _)) = self.peers.read().get_known_peers().get(&domain) {
+                    node_infos.push(NodeNetInfo {
+                        multi_address: addr.to_string(),
+                        origin: *origin,
+                    });
+                }
+            }
         }
 
         Ok(Response::new(TotalNodeNetInfo { nodes: node_infos }))

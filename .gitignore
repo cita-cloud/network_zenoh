@@ -62,4 +62,8 @@ logs/
 # db file
 *.db
 
+# tmp
 tmp/
+
+# pem
+*.pem
