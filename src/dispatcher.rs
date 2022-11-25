@@ -53,7 +53,7 @@ impl NetworkMsgDispatcher {
                 info!(
                     "Recycle the HEALTH_CHECK msg from: {:?}, by {}ms",
                     &msg.origin,
-                    now - u64::from_be_bytes(msg.msg[8..16].try_into().unwrap())
+                    now - u64::from_be_bytes(msg.msg[..8].try_into().unwrap())
                 );
             } else {
                 warn!(

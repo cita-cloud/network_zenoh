@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::HashSet, str::FromStr, sync::Arc};
+use std::{collections::HashSet, sync::Arc};
 
 use bytes::BytesMut;
 use cita_cloud_proto::network::NetworkMsg;
@@ -22,17 +22,14 @@ use parking_lot::RwLock;
 use prost::Message;
 use r#async::AsyncResolve;
 use util::write_to_file;
-use zenoh::{
-    config::{EndPoint, QoSConf},
-    prelude::*,
-};
+use zenoh::{config::QoSConf, prelude::*};
 
 use crate::{
     config::NetworkConfig,
     grpc_server::CitaCloudNetworkServiceServer,
     hot_update::try_hot_update,
     peer::PeersManger,
-    util::{self, calculate_md5},
+    util::{self, build_multiaddr, calculate_hash, calculate_md5},
 };
 
 pub async fn zenoh_serve(
@@ -48,7 +45,7 @@ pub async fn zenoh_serve(
 
     // Set the chain_id to the zenoh instance id
     zenoh_config
-        .set_id(ZenohId::from_str(&config.node_address[0..16]).unwrap())
+        .set_id(ZenohId::try_from(calculate_hash(&config.domain).to_be_bytes()).unwrap())
         .unwrap();
 
     zenoh_config
@@ -206,19 +203,30 @@ pub async fn zenoh_serve(
 
     // send_msg_check subscriber
     let outbound_msg_tx = network_svc.outbound_msg_tx.clone();
+    let peers_to_update = peers.clone();
     let _check_forward_subscriber = session
         .declare_subscriber(format!("{}-check", config.get_chain_origin()))
         .callback(move |sample| {
-            let mut msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
+            let msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
                 .map_err(|e| error!("{e}"))
                 .unwrap();
             if msg.origin != self_node_origin {
-                info!(
+                debug!(
                     "HEALTH_CHECK msg from: {}, sent at: {}",
                     msg.origin,
-                    u64::from_be_bytes(msg.msg[8..16].try_into().unwrap())
+                    u64::from_be_bytes(msg.msg[..8].try_into().unwrap())
                 );
-                msg.origin = u64::from_be_bytes(msg.msg[..8].try_into().unwrap());
+                // update peer node_address
+                if let Ok(domain) = std::str::from_utf8(&msg.msg[8..]) {
+                    info!(
+                        "update_known_peer_node_address: {} - {}",
+                        domain, msg.origin
+                    );
+                    peers_to_update
+                        .write()
+                        .update_known_peer_node_address(domain, msg.origin);
+                }
+                // send back
                 let _ = outbound_msg_tx.send(msg);
             }
         })
@@ -281,37 +289,33 @@ pub async fn zenoh_serve(
                 } else {
                     warn!("calculate config file md5 failed, make sure it's not removed");
                 };
-            },
-            // health check
-            _ = health_check_interval.tick() => {
+
                 // update connected peers
-                let endpoints: Vec<EndPoint> = session
-                    .config()
-                    .get("connect/endpoints")
-                    .map_err(|e| error!("{e}"))
-                    .unwrap()
-                    .downcast_ref::<Vec<EndPoint>>()
-                    .unwrap()
-                    .to_vec();
-                debug!("{:?}", endpoints);
                 let mut connected_peers = HashSet::new();
-                for endpoint in endpoints {
-                    connected_peers.insert(endpoint.locator.address().to_string());
+                let peers_zid = session.info().peers_zid().res().await;
+                for peer_zid in peers_zid {
+                    let zid = u64::from_be_bytes(peer_zid.as_slice()[..8].try_into().unwrap());
+                    for (domain, (_, peer_config)) in peers.read().get_known_peers().iter() {
+                        if calculate_hash(domain) == zid {
+                            connected_peers.insert(build_multiaddr("127.0.0.1", peer_config.port, domain));
+                        }
+                    }
                 }
                 {
                     let mut peers = peers.write();
                     peers.set_connected_peers(connected_peers);
                 }
-
+            },
+            // health check
+            _ = health_check_interval.tick() => {
                 // send msg check
-                let now = unix_now();
-                let mut msg = self_node_origin.to_be_bytes().to_vec();
-                msg.append(&mut now.to_be_bytes().to_vec());
+                let mut msg = unix_now().to_be_bytes().to_vec();
+                msg.append(&mut config.domain.as_bytes().to_vec());
                 let msg = NetworkMsg {
                     module: "HEALTH_CHECK".to_string(),
                     r#type: "HEALTH_CHECK".to_string(),
                     origin: self_node_origin,
-                    msg
+                    msg,
                 };
                 let publisher = session
                     .declare_publisher(format!("{}-check", config.get_chain_origin()))

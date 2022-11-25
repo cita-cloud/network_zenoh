@@ -14,7 +14,9 @@
 
 use md5::{compute, Digest};
 use std::{
+    collections::hash_map::DefaultHasher,
     fs,
+    hash::{Hash, Hasher},
     io::{Error, Write},
     path::{self, Path},
 };
@@ -30,6 +32,18 @@ pub fn write_to_file(content: &[u8], path: impl AsRef<path::Path>) {
         .unwrap();
     file.write_all(content).unwrap();
     file.flush().unwrap();
+}
+
+pub fn build_multiaddr(host: &str, port: u16, domain: &str) -> String {
+    // TODO: default to return Dns4 for host, consider if it' appropriate
+    vec![
+        Protocol::Dns4(host.into()),
+        Protocol::Tcp(port),
+        Protocol::Tls(domain.into()),
+    ]
+    .into_iter()
+    .collect::<MultiAddr>()
+    .to_string()
 }
 
 pub fn parse_multiaddr(s: &str) -> Option<(String, u16, String)> {
@@ -82,4 +96,10 @@ pub fn to_u64(tmp: &str) -> u64 {
     let mut decoded = [0; 8];
     hex::decode_to_slice(tmp, &mut decoded).unwrap();
     u64::from_be_bytes(decoded)
+}
+
+pub fn calculate_hash<T: Hash>(t: &T) -> u64 {
+    let mut s = DefaultHasher::new();
+    t.hash(&mut s);
+    s.finish()
 }

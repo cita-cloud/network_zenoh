@@ -62,7 +62,7 @@ pub async fn try_hot_update(
         if !known_peers.contains(&p.domain) {
             let mut guard = peers.write();
             info!("peer added: {}", &peer.get_address());
-            guard.add_known_peers(p.domain.clone(), peer);
+            guard.add_known_peers(p.domain.clone(), (0, peer));
         }
     }
     // update zenoh nodes to connect to
