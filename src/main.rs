@@ -85,6 +85,7 @@ struct RunOpts {
 async fn run(opts: RunOpts) {
     ::std::env::set_var("RUST_BACKTRACE", "full");
 
+    #[cfg(not(windows))]
     tokio::spawn(cloud_util::signal::handle_signals());
 
     // read config.toml
