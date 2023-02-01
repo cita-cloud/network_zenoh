@@ -106,7 +106,7 @@ impl NetworkService for CitaCloudNetworkServiceServer {
             Status::invalid_argument(StatusCodeEnum::MultiAddrParseError.to_string())
         })?;
 
-        let address = format!("quic/{}:{}", domain, port);
+        let address = format!("quic/{domain}:{port}");
 
         let endpoint: zenoh::prelude::config::EndPoint = address.parse().map_err(|_| {
             warn!("parse_addr: not a valid address: {}", address);

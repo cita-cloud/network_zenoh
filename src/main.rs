@@ -85,6 +85,7 @@ struct RunOpts {
 async fn run(opts: RunOpts) {
     ::std::env::set_var("RUST_BACKTRACE", "full");
 
+    #[cfg(not(windows))]
     tokio::spawn(cloud_util::signal::handle_signals());
 
     // read config.toml
@@ -92,7 +93,7 @@ async fn run(opts: RunOpts) {
 
     // init log4rs
     log4rs::init_file(&opts.log_file, Default::default())
-        .map_err(|e| println!("log init err: {}", e))
+        .map_err(|e| println!("log init err: {e}"))
         .unwrap();
 
     let grpc_port = config.grpc_port.to_string();
@@ -147,7 +148,7 @@ async fn run(opts: RunOpts) {
         chain_origin: config.get_chain_origin(),
     };
     let network_svc_hot_update = network_svc.clone();
-    let grpc_addr = format!("0.0.0.0:{}", grpc_port).parse().unwrap();
+    let grpc_addr = format!("0.0.0.0:{grpc_port}").parse().unwrap();
     let peers_for_health_check = peers.clone();
 
     // add layer if metrics is enabled
