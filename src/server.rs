@@ -44,9 +44,7 @@ pub async fn zenoh_serve(
     let mut zenoh_config = zenoh::prelude::config::peer();
 
     // Set the chain_id to the zenoh instance id
-    zenoh_config
-        .set_id(ZenohId::try_from(calculate_hash(&config.domain).to_be_bytes()).unwrap())
-        .unwrap();
+    zenoh_config.set_id(domain_to_zid(&config.domain)).unwrap();
 
     zenoh_config
         .scouting
@@ -294,9 +292,8 @@ pub async fn zenoh_serve(
                 let mut connected_peers = HashSet::new();
                 let peers_zid = session.info().peers_zid().res().await;
                 for peer_zid in peers_zid {
-                    let zid = u64::from_be_bytes(peer_zid.as_slice()[..8].try_into().unwrap());
                     for (domain, (_, peer_config)) in peers.read().get_known_peers().iter() {
-                        if calculate_hash(domain) == zid {
+                        if domain_to_zid(domain) == peer_zid {
                             connected_peers.insert(build_multiaddr("127.0.0.1", peer_config.port, domain));
                         }
                     }
@@ -338,4 +335,8 @@ pub async fn zenoh_serve(
             }
         }
     }
+}
+
+fn domain_to_zid(domain: &String) -> ZenohId {
+    ZenohId::try_from(calculate_hash(domain).to_be_bytes()).unwrap()
 }
