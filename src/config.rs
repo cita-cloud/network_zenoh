@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use cloud_util::common::read_toml;
+use cloud_util::{common::read_toml, tracer::LogConfig};
 use serde::{Deserialize, Serialize};
 use std::fs;
 
@@ -93,6 +93,8 @@ pub struct NetworkConfig {
     // more in-flight data. This is particularly relevant when dealing with large messages
     // E.g. for 16MiB rx_buffer_size set the value to: 16777216.
     pub rx_buffer_size: usize,
+    /// log config
+    pub log_config: LogConfig,
 }
 
 impl NetworkConfig {
@@ -147,6 +149,7 @@ impl Default for NetworkConfig {
                 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0, 25.0, 50.0, 75.0, 100.0, 250.0, 500.0,
             ],
             rx_buffer_size: 16777216,
+            log_config: Default::default(),
         }
     }
 }

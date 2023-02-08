@@ -11,7 +11,7 @@ docker build -t citacloud/network_zenoh .
 
 ```
 $ network -h
-network 6.6.0
+network 6.6.3
 Rivtower Technologies <contact@rivtower.com>
 This doc string acts as a help message when the user runs '--help' as do all doc strings on fields
 
@@ -43,7 +43,6 @@ USAGE:
 OPTIONS:
     -c, --config <CONFIG_PATH>    Chain config path [default: config.toml]
     -h, --help                    Print help information
-    -l, --log <LOG_FILE>          log config path [default: network-log4rs.yaml]
 
 ```
 
@@ -52,7 +51,7 @@ OPTIONS:
 
     参见示例`example/config.toml`。
 
-    其中：
+    其中`[network_zenoh]`
     * `ca_cert` 为`CA`根证书。
     * `cert` 为节点证书。
     * `priv_key` 为节点证书对应的私钥。
@@ -69,18 +68,16 @@ OPTIONS:
     * `health_check_timeout` 健康检查超时时间（以秒为单位）
     * `rx_buffer_size` 每个链接的接收缓冲区大小（以字节为单位）
 
-2. 日志配置文件。
-
-    参见示例`network-log4rs.yaml`。
-
-    其中：
-
-    * `level` 为日志等级。可选项有：`Error`，`Warn`，`Info`，`Debug`，`Trace`，默认为`Info`。
-    * `appenders` 为输出选项，类型为一个数组。可选项有：标准输出(`stdout`)和滚动的日志文件（`journey-service`），默认为同时输出到两个地方。
+    其中`[network_zenoh.log_config]`段为微服务日志的配置：
+    * `max_level` 日志等级
+    * `filter` 日志过滤配置
+    * `service_name` 服务名称，用作日志文件名与日志采集的服务名称
+    * `rolling_file_path` 日志文件路径
+    * `agent_endpoint` jaeger 采集端地址
 
 
 ```
-$ network run -c example/config.toml -l network-log4rs.yaml
+$ network run -c example/config.toml
 ```
 
 ## 设计

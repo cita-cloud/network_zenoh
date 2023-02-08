@@ -40,6 +40,11 @@ pQXNNJXfhAQG29kMfqG8Phd0cVWhRANCAARHShUWOsnmzxp398AhTaWjhE/2hf8P\r
 protocol = 'quic'
 validator_address = 'example/validator_address'
 
+[network_zenoh.log_config]
+rolling_file_path = "./logs"
+service_name = "network"
+agent_endpoint = "127.0.0.1:6831"
+
 [[network_zenoh.peers]]
 domain = 'test-chain-node1'
 protocol = 'quic'

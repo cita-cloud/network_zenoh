@@ -18,13 +18,12 @@ thiserror =  "1.0"
 tentacle-multiaddr = "0.3"
 clap = { version = "4.1", features = ["derive"] }
 backtrace = "0.3"
-log = "0.4"
-log4rs = { version = "1.2", features = ["gzip"] }
 md5 = "0.7"
 json5 = "0.4"
 tonic = "0.8"
 prost = "0.11"
 tower = "0.4"
+tracing = "0.1"
 
 cloud-util = { package = "cloud-util", git = "https://github.com/cita-cloud/cloud-common-rs.git" }
 cita_cloud_proto = { package = "cita_cloud_proto", git = "https://github.com/cita-cloud/cloud-common-rs.git" }

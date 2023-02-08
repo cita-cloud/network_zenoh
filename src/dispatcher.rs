@@ -22,7 +22,6 @@ use cita_cloud_proto::network::{
 use cita_cloud_proto::retry::RetryClient;
 use cloud_util::unix_now;
 use flume::Receiver;
-use log::{info, warn};
 use parking_lot::RwLock;
 
 pub struct NetworkMsgDispatcher {
