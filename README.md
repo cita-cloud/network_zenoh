@@ -34,15 +34,13 @@ SUBCOMMANDS:
 
 ```
 $ network run -h
-network-run 
 run this service
 
-USAGE:
-    network run [OPTIONS]
+Usage: network run [OPTIONS]
 
-OPTIONS:
-    -c, --config <CONFIG_PATH>    Chain config path [default: config.toml]
-    -h, --help                    Print help information
+Options:
+  -c, --config <CONFIG_PATH>  Chain config path [default: config.toml]
+  -h, --help                  Print help
 
 ```
 
@@ -78,6 +76,14 @@ OPTIONS:
 
 ```
 $ network run -c example/config.toml
+
+2023-02-08T09:38:08.501559Z  INFO network: grpc port of network_zenoh: 50000
+2023-02-08T09:38:08.502427Z  INFO network: start network_zenoh grpc server!
+2023-02-08T09:38:08.502463Z  INFO network: metrics on
+2023-02-08T09:38:08.502533Z  INFO cloud_util::metrics: exporting metrics to http://0.0.0.0:60000/metrics
+2023-02-08T09:38:08.504638Z  INFO zenoh::net::runtime: Using PID: 7A38F110A4661FE3    
+2023-02-08T09:38:08.514381Z  INFO zenoh::net::runtime::orchestrator: zenohd can be reached at quic/127.0.0.1:40000 
+
 ```
 
 ## 设计

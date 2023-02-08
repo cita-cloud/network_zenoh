@@ -79,9 +79,6 @@ struct RunOpts {
     /// Chain config path
     #[clap(short = 'c', long = "config", default_value = "config.toml")]
     config_path: String,
-    /// log config path
-    #[clap(short = 'l', long = "log", default_value = "network-log4rs.yaml")]
-    log_file: String,
 }
 
 async fn run(opts: RunOpts) {
