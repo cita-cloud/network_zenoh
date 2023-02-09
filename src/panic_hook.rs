@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use backtrace::Backtrace;
-use log::error;
 use std::panic::{self, PanicInfo};
 use std::process;
 use std::thread;

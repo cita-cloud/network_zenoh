@@ -17,7 +17,6 @@ use std::{collections::HashSet, sync::Arc};
 use bytes::BytesMut;
 use cita_cloud_proto::network::NetworkMsg;
 use cloud_util::unix_now;
-use log::{debug, error, info, warn};
 use parking_lot::RwLock;
 use prost::Message;
 use r#async::AsyncResolve;

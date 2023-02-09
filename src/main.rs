@@ -22,6 +22,9 @@ mod peer;
 mod server;
 mod util;
 
+#[macro_use]
+extern crate tracing as logger;
+
 use crate::{
     config::NetworkConfig, dispatcher::NetworkMsgDispatcher,
     grpc_server::CitaCloudNetworkServiceServer, health_check::HealthCheckServer, peer::PeersManger,
@@ -35,7 +38,6 @@ use clap::Parser;
 use cloud_util::metrics::{run_metrics_exporter, MiddlewareLayer};
 use cloud_util::unix_now;
 use flume::unbounded;
-use log::info;
 use panic_hook::set_panic_handler;
 use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
@@ -77,9 +79,6 @@ struct RunOpts {
     /// Chain config path
     #[clap(short = 'c', long = "config", default_value = "config.toml")]
     config_path: String,
-    /// log config path
-    #[clap(short = 'l', long = "log", default_value = "network-log4rs.yaml")]
-    log_file: String,
 }
 
 async fn run(opts: RunOpts) {
@@ -91,9 +90,9 @@ async fn run(opts: RunOpts) {
     // read config.toml
     let config = NetworkConfig::new(&opts.config_path);
 
-    // init log4rs
-    log4rs::init_file(&opts.log_file, Default::default())
-        .map_err(|e| println!("log init err: {e}"))
+    // init tracer
+    cloud_util::tracer::init_tracer(config.domain.clone(), &config.log_config)
+        .map_err(|e| println!("tracer init err: {e}"))
         .unwrap();
 
     let grpc_port = config.grpc_port.to_string();
