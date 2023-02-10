@@ -132,7 +132,7 @@ impl NetworkService for CitaCloudNetworkServiceServer {
             Status::invalid_argument(StatusCodeEnum::MultiAddrParseError.to_string())
         })?;
 
-        let address = endpoint.locator.address();
+        let address = endpoint.address();
         info!("attempt to add new peer: {}", &address);
 
         {
@@ -149,7 +149,7 @@ impl NetworkService for CitaCloudNetworkServiceServer {
             }
 
             let peer = PeerConfig {
-                protocol: endpoint.locator.protocol().to_string(),
+                protocol: endpoint.protocol().to_string(),
                 domain: domain.to_string(),
                 port,
             };
