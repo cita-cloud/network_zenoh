@@ -38,7 +38,7 @@ pub async fn zenoh_serve(
     outbound_msg_rx: flume::Receiver<NetworkMsg>,
 ) {
     // read config.toml
-    let config = NetworkConfig::new(config_path);
+    let mut config = NetworkConfig::new(config_path);
     // Peer instance mode
     let mut zenoh_config = zenoh::prelude::config::peer();
 
@@ -281,7 +281,7 @@ pub async fn zenoh_serve(
                     if new_md5 != config_md5 {
                         info!("config file new md5: {:x}", new_md5);
                         config_md5 = new_md5;
-                        try_hot_update(config_path, network_svc.peers.clone(), session.config()).await;
+                        config = try_hot_update(config_path, network_svc.peers.clone(), session.config()).await;
                     }
                 } else {
                     warn!("calculate config file md5 failed, make sure it's not removed");
@@ -326,6 +326,21 @@ pub async fn zenoh_serve(
                     .put(&*dst)
                     .res()
                     .await
+                    .unwrap();
+                // Reconnect if disconnected
+                session
+                    .config()
+                    .insert_json5(
+                        "connect/endpoints",
+                        &json5::to_string(
+                            &config
+                                .peers
+                                .iter()
+                                .map(|peer| peer.get_address())
+                                .collect::<Vec<String>>(),
+                        )
+                        .unwrap(),
+                    )
                     .unwrap();
             },
             else => {

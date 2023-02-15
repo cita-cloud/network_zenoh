@@ -29,7 +29,7 @@ pub async fn try_hot_update(
     path: &str,
     peers: Arc<RwLock<PeersManger>>,
     mut zenoh_config: &Notifier<Config>,
-) {
+) -> NetworkConfig {
     let new_config = NetworkConfig::new(path);
     let known_peers;
     {
@@ -49,7 +49,7 @@ pub async fn try_hot_update(
     debug!("peers in config file: {:?}", new_peers);
     //try to add node
     let mut connect_peers = Vec::new();
-    for p in new_config.peers {
+    for p in &new_config.peers {
         let peer = PeerConfig {
             protocol: "quic".to_string(),
             port: p.port,
@@ -79,4 +79,5 @@ pub async fn try_hot_update(
             info!("peer deleted: {}", p);
         }
     }
+    new_config
 }
