@@ -87,6 +87,13 @@ pub async fn zenoh_serve(
         .set_buffer_size(Some(config.rx_buffer_size))
         .unwrap();
 
+    // Maximum number of unicast incoming links per transport session
+    zenoh_config
+        .transport
+        .unicast
+        .set_max_links(Some(4))
+        .unwrap();
+
     // the shared-memory transport will be disabled.
     zenoh_config
         .transport
