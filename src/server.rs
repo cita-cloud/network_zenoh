@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, str::FromStr, sync::Arc};
 
 use bytes::BytesMut;
 use cita_cloud_proto::network::NetworkMsg;
@@ -42,8 +42,10 @@ pub async fn zenoh_serve(
     // Peer instance mode
     let mut zenoh_config = zenoh::prelude::config::peer();
 
-    // Set the chain_id to the zenoh instance id
-    zenoh_config.set_id(domain_to_zid(&config.domain)).unwrap();
+    // Use rand ZenohId
+    let zid = domain_to_zid(&config.domain);
+    info!("ZenohId: {zid}");
+    zenoh_config.set_id(zid).unwrap();
 
     zenoh_config
         .scouting
@@ -306,7 +308,7 @@ pub async fn zenoh_serve(
                 let peers_zid = session.info().peers_zid().res().await;
                 for peer_zid in peers_zid {
                     for (domain, (_, peer_config)) in peers.read().get_known_peers().iter() {
-                        if domain_to_zid(domain) == peer_zid {
+                        if compare_domain_with_zid(domain, &peer_zid) {
                             connected_peers.insert(build_multiaddr("127.0.0.1", peer_config.port, domain));
                         }
                     }
@@ -364,6 +366,34 @@ pub async fn zenoh_serve(
     }
 }
 
-fn domain_to_zid(domain: &String) -> ZenohId {
-    ZenohId::try_from(calculate_hash(domain).to_be_bytes()).unwrap()
+fn domain_to_zid(domain: &str) -> ZenohId {
+    let domain_hash = calculate_hash(&domain);
+    debug!("domain_hash: {domain_hash}");
+    let domain_hash_hex = hex::encode_upper(domain_hash.to_be_bytes());
+    let domain_hash_hex = &domain_hash_hex[0..12];
+    debug!("domain_hash_hex[0..12]: {domain_hash_hex}");
+    let seed = hex::encode_upper(rand::random::<u16>().to_be_bytes());
+    ZenohId::from_str(&format!("{domain_hash_hex}{seed}")).unwrap()
+}
+
+fn compare_domain_with_zid(domain: &str, zid: &ZenohId) -> bool {
+    let domain_hash = calculate_hash(&domain);
+    debug!("domain_hash: {domain_hash}");
+    let domain_hash_hex = hex::encode_upper(domain_hash.to_be_bytes());
+    let domain_hash_hex = &domain_hash_hex[0..12];
+
+    if zid.to_string()[0..12].eq(domain_hash_hex) {
+        return true;
+    }
+    false
+}
+
+#[test]
+fn test_domain_to_zid() {
+    assert!(compare_domain_with_zid("0", &domain_to_zid("0")));
+    assert!(compare_domain_with_zid("test", &domain_to_zid("test")));
+    assert!(compare_domain_with_zid(
+        "test-chain-78325234897562387465",
+        &domain_to_zid("test-chain-78325234897562387465")
+    ));
 }
