@@ -216,20 +216,17 @@ pub async fn zenoh_serve(
                 .map_err(|e| error!("{e}"))
                 .unwrap();
             if msg.origin != self_node_origin {
-                debug!(
-                    "HEALTH_CHECK msg from: {}, sent at: {}",
-                    msg.origin,
-                    u64::from_be_bytes(msg.msg[..8].try_into().unwrap())
-                );
                 // update peer node_address
-                if let Ok(domain) = std::str::from_utf8(&msg.msg[8..]) {
-                    info!(
-                        "update_known_peer_node_address: {} - {}",
-                        domain, msg.origin
-                    );
-                    peers_to_update
-                        .write()
-                        .update_known_peer_node_address(domain, msg.origin);
+                if let Ok(check_msg) = std::str::from_utf8(&msg.msg) {
+                    if let Some((time, domain)) = check_msg.split_once('@') {
+                        info!(
+                            "HEALTH_CHECK msg from: {} - {}, sent at: {}",
+                            domain, msg.origin, time
+                        );
+                        peers_to_update
+                            .write()
+                            .update_known_peer_node_address(domain, msg.origin);
+                    }
                 }
                 // send back
                 let _ = outbound_msg_tx.send(msg);
@@ -317,8 +314,7 @@ pub async fn zenoh_serve(
             // health check
             _ = health_check_interval.tick() => {
                 // send msg check
-                let mut msg = unix_now().to_be_bytes().to_vec();
-                msg.append(&mut config.domain.as_bytes().to_vec());
+                let msg = format!("{}@{}", unix_now(), config.domain).as_bytes().to_vec();
                 let msg = NetworkMsg {
                     module: "HEALTH_CHECK".to_string(),
                     r#type: "HEALTH_CHECK".to_string(),
