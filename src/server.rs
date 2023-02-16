@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::HashSet, sync::Arc};
+use std::{collections::HashSet, str::FromStr, sync::Arc};
 
 use bytes::BytesMut;
 use cita_cloud_proto::network::NetworkMsg;
@@ -42,8 +42,10 @@ pub async fn zenoh_serve(
     // Peer instance mode
     let mut zenoh_config = zenoh::prelude::config::peer();
 
-    // Set the chain_id to the zenoh instance id
-    zenoh_config.set_id(domain_to_zid(&config.domain)).unwrap();
+    // Use rand ZenohId
+    let zid = domain_to_zid(&config.domain);
+    info!("ZenohId: {zid}");
+    zenoh_config.set_id(zid).unwrap();
 
     zenoh_config
         .scouting
@@ -148,6 +150,7 @@ pub async fn zenoh_serve(
     let session = zenoh::open(zenoh_config).res().await.unwrap();
 
     let self_node_origin = config.get_node_origin();
+    let self_validator_origin = config.get_validator_origin();
 
     // node subscriber
     let inbound_msg_tx = network_svc.inbound_msg_tx.clone();
@@ -185,11 +188,11 @@ pub async fn zenoh_serve(
 
     // When the controller (node) address is the same as the consensus address, simply subscribe to the controller (node) address
     let _validator_subscriber;
-    if self_node_origin != config.get_validator_origin() {
+    if self_node_origin != self_validator_origin {
         debug!("------ (node_origin != validator_origin)");
         let inbound_msg_tx = network_svc.inbound_msg_tx.clone();
         _validator_subscriber = session
-            .declare_subscriber(config.get_validator_origin().to_string())
+            .declare_subscriber(self_validator_origin.to_string())
             .callback(move |sample| {
                 let msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
                     .map_err(|e| error!("{e}"))
@@ -215,20 +218,22 @@ pub async fn zenoh_serve(
                 .map_err(|e| error!("{e}"))
                 .unwrap();
             if msg.origin != self_node_origin {
-                debug!(
-                    "HEALTH_CHECK msg from: {}, sent at: {}",
-                    msg.origin,
-                    u64::from_be_bytes(msg.msg[..8].try_into().unwrap())
-                );
                 // update peer node_address
-                if let Ok(domain) = std::str::from_utf8(&msg.msg[8..]) {
-                    info!(
-                        "update_known_peer_node_address: {} - {}",
-                        domain, msg.origin
-                    );
-                    peers_to_update
-                        .write()
-                        .update_known_peer_node_address(domain, msg.origin);
+                match std::str::from_utf8(&msg.msg) {
+                    Ok(check_msg) => {
+                        if let Some((time, domain)) = check_msg.split_once('@') {
+                            info!(
+                                "HEALTH_CHECK msg from: {} - {}, sent at: {}",
+                                domain, msg.origin, time
+                            );
+                            peers_to_update
+                                .write()
+                                .update_known_peer_node_address(domain, msg.origin);
+                        } else {
+                            error!("The format of health_check_msg is wrong: {}", check_msg)
+                        }
+                    }
+                    Err(e) => error!("HEALTH_CHECK error: {}", e),
                 }
                 // send back
                 let _ = outbound_msg_tx.send(msg);
@@ -271,7 +276,11 @@ pub async fn zenoh_serve(
                         .res()
                         .await
                         .unwrap();
-                    msg.origin = self_node_origin;
+                    msg.origin = if "consensus".eq(&msg.module) {
+                        self_validator_origin
+                    } else {
+                        self_node_origin
+                    };
                     let mut dst = BytesMut::new();
                     msg.encode(&mut dst).unwrap();
                     publisher
@@ -299,7 +308,7 @@ pub async fn zenoh_serve(
                 let peers_zid = session.info().peers_zid().res().await;
                 for peer_zid in peers_zid {
                     for (domain, (_, peer_config)) in peers.read().get_known_peers().iter() {
-                        if domain_to_zid(domain) == peer_zid {
+                        if compare_domain_with_zid(domain, &peer_zid) {
                             connected_peers.insert(build_multiaddr("127.0.0.1", peer_config.port, domain));
                         }
                     }
@@ -312,8 +321,7 @@ pub async fn zenoh_serve(
             // health check
             _ = health_check_interval.tick() => {
                 // send msg check
-                let mut msg = unix_now().to_be_bytes().to_vec();
-                msg.append(&mut config.domain.as_bytes().to_vec());
+                let msg = format!("{}@{}", unix_now(), config.domain).as_bytes().to_vec();
                 let msg = NetworkMsg {
                     module: "HEALTH_CHECK".to_string(),
                     r#type: "HEALTH_CHECK".to_string(),
@@ -334,21 +342,6 @@ pub async fn zenoh_serve(
                     .res()
                     .await
                     .unwrap();
-                // Reconnect if disconnected
-                session
-                    .config()
-                    .insert_json5(
-                        "connect/endpoints",
-                        &json5::to_string(
-                            &config
-                                .peers
-                                .iter()
-                                .map(|peer| peer.get_address())
-                                .collect::<Vec<String>>(),
-                        )
-                        .unwrap(),
-                    )
-                    .unwrap();
             },
             else => {
                 debug!("network stopped!");
@@ -358,6 +351,34 @@ pub async fn zenoh_serve(
     }
 }
 
-fn domain_to_zid(domain: &String) -> ZenohId {
-    ZenohId::try_from(calculate_hash(domain).to_be_bytes()).unwrap()
+fn domain_to_zid(domain: &str) -> ZenohId {
+    let domain_hash = calculate_hash(&domain);
+    debug!("domain_hash: {domain_hash}");
+    let domain_hash_hex = hex::encode_upper(domain_hash.to_be_bytes());
+    let domain_hash_hex = &domain_hash_hex[0..12];
+    debug!("domain_hash_hex[0..12]: {domain_hash_hex}");
+    let seed = hex::encode_upper(rand::random::<u16>().to_be_bytes());
+    ZenohId::from_str(&format!("{domain_hash_hex}{seed}")).unwrap()
+}
+
+fn compare_domain_with_zid(domain: &str, zid: &ZenohId) -> bool {
+    let domain_hash = calculate_hash(&domain);
+    debug!("domain_hash: {domain_hash}");
+    let domain_hash_hex = hex::encode_upper(domain_hash.to_be_bytes());
+    let domain_hash_hex = &domain_hash_hex[0..12];
+
+    if zid.to_string()[0..12].eq(domain_hash_hex) {
+        return true;
+    }
+    false
+}
+
+#[test]
+fn test_domain_to_zid() {
+    assert!(compare_domain_with_zid("0", &domain_to_zid("0")));
+    assert!(compare_domain_with_zid("test", &domain_to_zid("test")));
+    assert!(compare_domain_with_zid(
+        "test-chain-78325234897562387465",
+        &domain_to_zid("test-chain-78325234897562387465")
+    ));
 }

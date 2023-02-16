@@ -49,11 +49,17 @@ impl NetworkMsgDispatcher {
             } else if msg.module == "HEALTH_CHECK" {
                 let now = unix_now();
                 *self.send_msg_check.write() = now;
-                info!(
-                    "Recycle the HEALTH_CHECK msg from: {:?}, by {}ms",
-                    &msg.origin,
-                    now - u64::from_be_bytes(msg.msg[..8].try_into().unwrap())
-                );
+                if let Ok(check_msg) = std::str::from_utf8(&msg.msg) {
+                    if let Some((time, _domain)) = check_msg.split_once('@') {
+                        if let Ok(time) = time.parse::<u64>() {
+                            info!(
+                                "Recycle the HEALTH_CHECK msg from: {:?}, by {}ms",
+                                &msg.origin,
+                                now - time
+                            );
+                        }
+                    }
+                }
             } else {
                 warn!(
                     "Unknown module, will drop msg: msg.module {} msg.origin {}",
