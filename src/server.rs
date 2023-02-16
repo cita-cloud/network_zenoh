@@ -342,21 +342,6 @@ pub async fn zenoh_serve(
                     .res()
                     .await
                     .unwrap();
-                // Reconnect if disconnected
-                session
-                    .config()
-                    .insert_json5(
-                        "connect/endpoints",
-                        &json5::to_string(
-                            &config
-                                .peers
-                                .iter()
-                                .map(|peer| peer.get_address())
-                                .collect::<Vec<String>>(),
-                        )
-                        .unwrap(),
-                    )
-                    .unwrap();
             },
             else => {
                 debug!("network stopped!");
