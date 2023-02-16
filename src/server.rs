@@ -217,16 +217,21 @@ pub async fn zenoh_serve(
                 .unwrap();
             if msg.origin != self_node_origin {
                 // update peer node_address
-                if let Ok(check_msg) = std::str::from_utf8(&msg.msg) {
-                    if let Some((time, domain)) = check_msg.split_once('@') {
-                        info!(
-                            "HEALTH_CHECK msg from: {} - {}, sent at: {}",
-                            domain, msg.origin, time
-                        );
-                        peers_to_update
-                            .write()
-                            .update_known_peer_node_address(domain, msg.origin);
+                match std::str::from_utf8(&msg.msg) {
+                    Ok(check_msg) => {
+                        if let Some((time, domain)) = check_msg.split_once('@') {
+                            info!(
+                                "HEALTH_CHECK msg from: {} - {}, sent at: {}",
+                                domain, msg.origin, time
+                            );
+                            peers_to_update
+                                .write()
+                                .update_known_peer_node_address(domain, msg.origin);
+                        } else {
+                            error!("The format of health_check_msg is wrong: {}", check_msg)
+                        }
                     }
+                    Err(e) => error!("HEALTH_CHECK error: {}", e),
                 }
                 // send back
                 let _ = outbound_msg_tx.send(msg);
