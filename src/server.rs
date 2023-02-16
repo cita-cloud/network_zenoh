@@ -148,6 +148,7 @@ pub async fn zenoh_serve(
     let session = zenoh::open(zenoh_config).res().await.unwrap();
 
     let self_node_origin = config.get_node_origin();
+    let self_validator_origin = config.get_validator_origin();
 
     // node subscriber
     let inbound_msg_tx = network_svc.inbound_msg_tx.clone();
@@ -185,11 +186,11 @@ pub async fn zenoh_serve(
 
     // When the controller (node) address is the same as the consensus address, simply subscribe to the controller (node) address
     let _validator_subscriber;
-    if self_node_origin != config.get_validator_origin() {
+    if self_node_origin != self_validator_origin {
         debug!("------ (node_origin != validator_origin)");
         let inbound_msg_tx = network_svc.inbound_msg_tx.clone();
         _validator_subscriber = session
-            .declare_subscriber(config.get_validator_origin().to_string())
+            .declare_subscriber(self_validator_origin.to_string())
             .callback(move |sample| {
                 let msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
                     .map_err(|e| error!("{e}"))
@@ -271,7 +272,11 @@ pub async fn zenoh_serve(
                         .res()
                         .await
                         .unwrap();
-                    msg.origin = self_node_origin;
+                    msg.origin = if "consensus".eq(&msg.module) {
+                        self_validator_origin
+                    } else {
+                        self_node_origin
+                    };
                     let mut dst = BytesMut::new();
                     msg.encode(&mut dst).unwrap();
                     publisher
