@@ -14,6 +14,7 @@
 
 use std::sync::Arc;
 
+use log::{debug, info};
 use parking_lot::RwLock;
 use zenoh::{
     config::{Config, Notifier},

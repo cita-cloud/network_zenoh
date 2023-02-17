@@ -14,6 +14,8 @@
 
 use std::collections::{HashMap, HashSet};
 
+use log::debug;
+
 use crate::config::PeerConfig;
 
 #[derive(Debug)]
