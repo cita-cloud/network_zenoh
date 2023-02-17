@@ -43,14 +43,10 @@ pub struct CitaCloudNetworkServiceServer {
 
 #[tonic::async_trait]
 impl NetworkService for CitaCloudNetworkServiceServer {
-    #[instrument(skip_all)]
     async fn send_msg(
         &self,
         request: Request<NetworkMsg>,
     ) -> Result<Response<StatusCode>, tonic::Status> {
-        cloud_util::tracer::set_parent(&request);
-        debug!("send_msg request: {:?}", request);
-
         let msg = request.into_inner();
         debug!("send_msg: {:?}", &msg);
         let _ = self
@@ -61,14 +57,10 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         Ok(Response::new(StatusCodeEnum::Success.into()))
     }
 
-    #[instrument(skip_all)]
     async fn broadcast(
         &self,
         request: Request<NetworkMsg>,
     ) -> Result<Response<StatusCode>, tonic::Status> {
-        cloud_util::tracer::set_parent(&request);
-        debug!("broadcast request: {:?}", request);
-
         let mut msg = request.into_inner();
         debug!("broadcast: {:?}", &msg);
         msg.origin = self.chain_origin;
@@ -81,14 +73,10 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         Ok(Response::new(StatusCodeEnum::Success.into()))
     }
 
-    #[instrument(skip_all)]
     async fn get_network_status(
         &self,
-        request: Request<Empty>,
+        _request: Request<Empty>,
     ) -> Result<Response<NetworkStatusResponse>, tonic::Status> {
-        cloud_util::tracer::set_parent(&request);
-        debug!("get_network_status request: {:?}", request);
-
         let reply = NetworkStatusResponse {
             peer_count: self.peers.read().get_connected_peers().len() as u64,
         };
@@ -96,25 +84,17 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         Ok(Response::new(reply))
     }
 
-    #[instrument(skip_all)]
     async fn register_network_msg_handler(
         &self,
-        request: Request<RegisterInfo>,
+        _request: Request<RegisterInfo>,
     ) -> Result<Response<StatusCode>, tonic::Status> {
-        cloud_util::tracer::set_parent(&request);
-        debug!("register_network_msg_handler request: {:?}", request);
-
         Ok(Response::new(StatusCodeEnum::Success.into()))
     }
 
-    #[instrument(skip_all)]
     async fn add_node(
         &self,
         request: Request<NodeNetInfo>,
     ) -> Result<Response<StatusCode>, tonic::Status> {
-        cloud_util::tracer::set_parent(&request);
-        debug!("add_node request: {:?}", request);
-
         let node_net_info = request.into_inner();
         let multiaddr = node_net_info.multi_address;
 
@@ -162,14 +142,10 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         Ok(Response::new(StatusCodeEnum::Success.into()))
     }
 
-    #[instrument(skip_all)]
     async fn get_peers_net_info(
         &self,
-        request: Request<Empty>,
+        _request: Request<Empty>,
     ) -> Result<Response<TotalNodeNetInfo>, tonic::Status> {
-        cloud_util::tracer::set_parent(&request);
-        debug!("get_peers_net_info request: {:?}", request);
-
         let mut node_infos: Vec<NodeNetInfo> = vec![];
         let peers;
         {

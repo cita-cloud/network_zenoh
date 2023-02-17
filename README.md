@@ -34,9 +34,11 @@ SUBCOMMANDS:
 
 ```
 $ network run -h
+network-run 
 run this service
 
-Usage: network run [OPTIONS]
+USAGE:
+    network run [OPTIONS]
 
 OPTIONS:
     -c, --config <CONFIG_PATH>    Chain config path [default: config.toml]
