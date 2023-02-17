@@ -1,6 +1,6 @@
 [package]
 name = "network"
-version = "6.6.3"
+version = "6.6.3-sp1"
 authors = ["Rivtower Technologies <contact@rivtower.com>"]
 edition = "2021"
 
@@ -26,6 +26,6 @@ prost = "0.11"
 tower = "0.4"
 rand = "0.8"
 
-zenoh = { git = "https://github.com/cita-cloud/zenoh" }
-cloud-util = { package = "cloud-util", git = "https://github.com/cita-cloud/cloud-common-rs" }
-cita_cloud_proto = { package = "cita_cloud_proto", git = "https://github.com/cita-cloud/cloud-common-rs" }
+zenoh = { git = "https://github.com/cita-cloud/zenoh.git", tag = "v6.6.3-sp1" }
+cloud-util = "0.6.0"
+cita_cloud_proto = "6.6.3"

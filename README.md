@@ -11,20 +11,17 @@ docker build -t citacloud/network_zenoh .
 
 ```
 $ network -h
-network 6.6.0
-Rivtower Technologies <contact@rivtower.com>
 This doc string acts as a help message when the user runs '--help' as do all doc strings on fields
 
-USAGE:
-    network <SUBCOMMAND>
+Usage: network <COMMAND>
 
-OPTIONS:
-    -h, --help       Print help information
-    -V, --version    Print version information
+Commands:
+  run   run this service
+  help  Print this message or the help of the given subcommand(s)
 
-SUBCOMMANDS:
-    help    Print this message or the help of the given subcommand(s)
-    run     run this service
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
 
 ```
 
@@ -34,16 +31,14 @@ SUBCOMMANDS:
 
 ```
 $ network run -h
-network-run 
 run this service
 
-USAGE:
-    network run [OPTIONS]
+Usage: network run [OPTIONS]
 
-OPTIONS:
-    -c, --config <CONFIG_PATH>    Chain config path [default: config.toml]
-    -h, --help                    Print help information
-    -l, --log <LOG_FILE>          log config path [default: network-log4rs.yaml]
+Options:
+  -c, --config <CONFIG_PATH>  Chain config path [default: config.toml]
+  -l, --log <LOG_FILE>        log config path [default: network-log4rs.yaml]
+  -h, --help                  Print help
 
 ```
 
