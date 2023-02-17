@@ -41,6 +41,7 @@ use flume::unbounded;
 use panic_hook::set_panic_handler;
 use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
+use util::clap_about;
 
 const CLIENT_NAME: &str = "network";
 
@@ -60,7 +61,7 @@ fn main() {
 /// This doc string acts as a help message when the user runs '--help'
 /// as do all doc strings on fields
 #[derive(Parser)]
-#[clap(version, author)]
+#[clap(version, about = clap_about())]
 struct Opts {
     #[clap(subcommand)]
     subcmd: SubCommand,

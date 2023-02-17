@@ -13,19 +13,16 @@ docker build -t citacloud/network_zenoh .
 $ network -h
 network 6.6.3
 Rivtower Technologies <contact@rivtower.com>
-This doc string acts as a help message when the user runs '--help' as do all doc strings on fields
 
-USAGE:
-    network <SUBCOMMAND>
+Usage: network <COMMAND>
 
-OPTIONS:
-    -h, --help       Print help information
-    -V, --version    Print version information
+Commands:
+  run   run this service
+  help  Print this message or the help of the given subcommand(s)
 
-SUBCOMMANDS:
-    help    Print this message or the help of the given subcommand(s)
-    run     run this service
-
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
 ```
 
 ### network-run
