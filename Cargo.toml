@@ -26,5 +26,5 @@ tracing = "0.1"
 rand = "0.8"
 
 zenoh = { git = "https://github.com/cita-cloud/zenoh", tag = "v6.6.4" }
-cloud-util = "0.6.1"
-cita_cloud_proto = "6.6.4"
+cloud-util = "=0.6.1"
+cita_cloud_proto = "=6.6.4"
