@@ -52,6 +52,13 @@ fn main() {
     // (as below), requesting just the name used, or both at the same time
     match opts.subcmd {
         SubCommand::Run(opts) => {
+            // read config.toml
+            let config = NetworkConfig::new(&opts.config_path);
+
+            // init tracer
+            cloud_util::tracer::init_tracer(config.domain, &config.log_config)
+                .map_err(|e| println!("tracer init err: {e}"))
+                .unwrap();
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(run(opts));
         }
@@ -90,11 +97,6 @@ async fn run(opts: RunOpts) {
 
     // read config.toml
     let config = NetworkConfig::new(&opts.config_path);
-
-    // init tracer
-    cloud_util::tracer::init_tracer(config.domain.clone(), &config.log_config)
-        .map_err(|e| println!("tracer init err: {e}"))
-        .unwrap();
 
     let grpc_port = config.grpc_port.to_string();
     info!("grpc port of network_zenoh: {}", &grpc_port);
