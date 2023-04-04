@@ -1,12 +1,12 @@
 [package]
 name = "network"
-version = "6.6.4"
+version = "6.6.5"
 authors = ["Rivtower Technologies <contact@rivtower.com>"]
 edition = "2021"
 
 [dependencies]
 flume = "0.10"
-tokio = { version = "1.25", features = ["rt-multi-thread", "time"] }
+tokio = { version = "1.27", features = ["rt-multi-thread", "time"] }
 tokio-util = "0.7"
 parking_lot = "0.12"
 toml = "0.7"
@@ -15,11 +15,11 @@ bytes = "1.4"
 hex = "0.4"
 thiserror =  "1.0"
 tentacle-multiaddr = "0.3"
-clap = { version = "4.1", features = ["derive"] }
+clap = { version = "4.2", features = ["derive"] }
 backtrace = "0.3"
 md5 = "0.7"
 json5 = "0.4"
-tonic = "0.8"
+tonic = "0.9"
 prost = "0.11"
 tower = "0.4"
 tracing = "0.1"
