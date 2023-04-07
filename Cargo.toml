@@ -1,30 +1,44 @@
 [package]
-name = "network"
-version = "6.6.5"
-authors = ["Rivtower Technologies <contact@rivtower.com>"]
-edition = "2021"
+name = 'network'
+version = '6.6.5-beta1'
+edition = '2021'
+authors = ['Rivtower Technologies <contact@rivtower.com>']
 
 [dependencies]
-flume = "0.10"
-tokio = { version = "1.27", features = ["rt-multi-thread", "time"] }
-tokio-util = "0.7"
-parking_lot = "0.12"
-toml = "0.7"
-serde = { version = "1.0", features = ["derive"] }
-bytes = "1.4"
-hex = "0.4"
-thiserror =  "1.0"
-tentacle-multiaddr = "0.3"
-clap = { version = "4.2", features = ["derive"] }
-backtrace = "0.3"
-md5 = "0.7"
-json5 = "0.4"
-tonic = "0.9"
-prost = "0.11"
-tower = "0.4"
-tracing = "0.1"
-rand = "0.8"
+flume = '0.10'
+tokio-util = '0.7'
+parking_lot = '0.12'
+toml = '0.7'
+bytes = '1.4'
+hex = '0.4'
+thiserror = '1.0'
+tentacle-multiaddr = '0.3'
+backtrace = '0.3'
+md5 = '0.7'
+json5 = '0.4'
+tonic = '0.9'
+prost = '0.11'
+tower = '0.4'
+tracing = '0.1'
+rand = '0.8'
+cloud-util = '=0.6.2-beta1'
+cita_cloud_proto = '=6.6.5-beta1'
 
-zenoh = { git = "https://github.com/cita-cloud/zenoh" }
-cloud-util = { package = "cloud-util", git = "https://github.com/cita-cloud/cloud-common-rs" }
-cita_cloud_proto = { package = "cita_cloud_proto", git = "https://github.com/cita-cloud/cloud-common-rs" }
+[dependencies.tokio]
+version = '1.27'
+features = [
+    'rt-multi-thread',
+    'time',
+]
+
+[dependencies.serde]
+version = '1.0'
+features = ['derive']
+
+[dependencies.clap]
+version = '4.2'
+features = ['derive']
+
+[dependencies.zenoh]
+git = 'https://github.com/cita-cloud/zenoh'
+tag = 'v6.6.5-beta1'
