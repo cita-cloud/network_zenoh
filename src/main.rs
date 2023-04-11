@@ -17,7 +17,6 @@ mod dispatcher;
 mod grpc_server;
 mod health_check;
 mod hot_update;
-mod panic_hook;
 mod peer;
 mod server;
 mod util;
@@ -36,9 +35,9 @@ use cita_cloud_proto::{
 };
 use clap::Parser;
 use cloud_util::metrics::{run_metrics_exporter, MiddlewareLayer};
+use cloud_util::panic_hook::set_panic_handler;
 use cloud_util::unix_now;
 use flume::unbounded;
-use panic_hook::set_panic_handler;
 use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
 use util::clap_about;

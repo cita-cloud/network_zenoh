@@ -16,7 +16,6 @@ hex = "0.4"
 thiserror =  "1.0"
 tentacle-multiaddr = "0.3"
 clap = { version = "4.2", features = ["derive"] }
-backtrace = "0.3"
 md5 = "0.7"
 json5 = "0.4"
 tonic = "0.9"
