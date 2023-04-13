@@ -40,4 +40,4 @@ features = ['derive']
 
 [dependencies.zenoh]
 git = 'https://github.com/cita-cloud/zenoh'
-tag = 'v6.6.5-beta2'
+tag = 'v6.6.5-beta1'
