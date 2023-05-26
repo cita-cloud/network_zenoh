@@ -171,7 +171,9 @@ async fn run(opts: RunOpts) {
         tokio::spawn(async move {
             tonic::transport::Server::builder()
                 .layer(layer.unwrap())
-                .add_service(NetworkServiceServer::new(network_svc))
+                .add_service(
+                    NetworkServiceServer::new(network_svc).max_decoding_message_size(usize::MAX),
+                )
                 .add_service(HealthServer::new(HealthCheckServer::new(
                     peers_for_health_check,
                     send_msg_check,
@@ -185,7 +187,9 @@ async fn run(opts: RunOpts) {
         info!("metrics off");
         tokio::spawn(async move {
             tonic::transport::Server::builder()
-                .add_service(NetworkServiceServer::new(network_svc))
+                .add_service(
+                    NetworkServiceServer::new(network_svc).max_decoding_message_size(usize::MAX),
+                )
                 .add_service(HealthServer::new(HealthCheckServer::new(
                     peers_for_health_check,
                     send_msg_check,
