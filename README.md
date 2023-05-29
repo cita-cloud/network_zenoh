@@ -11,7 +11,7 @@ docker build -t citacloud/network_zenoh .
 
 ```
 $ network -h
-network 6.6.5
+network 6.7.0
 Rivtower Technologies <contact@rivtower.com>
 
 Usage: network <COMMAND>
