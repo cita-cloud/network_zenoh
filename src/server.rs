@@ -12,23 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{collections::HashSet, str::FromStr, sync::Arc};
-
 use bytes::BytesMut;
-use cita_cloud_proto::network::NetworkMsg;
-use cloud_util::unix_now;
 use parking_lot::RwLock;
 use prost::Message;
 use r#async::AsyncResolve;
-use util::write_to_file;
+use std::{str::FromStr, sync::Arc, time::Duration};
+use tokio::time::interval;
 use zenoh::{config::QoSConf, prelude::*};
+use zenoh_ext::SubscriberBuilderExt;
+
+use cita_cloud_proto::network::NetworkMsg;
+use util::write_to_file;
 
 use crate::{
     config::NetworkConfig,
     grpc_server::CitaCloudNetworkServiceServer,
     hot_update::try_hot_update,
     peer::PeersManger,
-    util::{self, build_multiaddr, calculate_hash, calculate_md5},
+    util::{self, calculate_md5},
 };
 
 pub async fn zenoh_serve(
@@ -38,12 +39,12 @@ pub async fn zenoh_serve(
     outbound_msg_rx: flume::Receiver<NetworkMsg>,
 ) {
     // read config.toml
-    let mut config = NetworkConfig::new(config_path);
+    let config = NetworkConfig::new(config_path);
     // Peer instance mode
     let mut zenoh_config = zenoh::prelude::config::peer();
 
     // Use rand ZenohId
-    let zid = domain_to_zid(&config.domain);
+    let zid = ZenohId::default();
     info!("ZenohId: {zid}");
     zenoh_config.set_id(zid).unwrap();
 
@@ -208,38 +209,42 @@ pub async fn zenoh_serve(
             .unwrap();
     }
 
-    // send_msg_check subscriber
-    let outbound_msg_tx = network_svc.outbound_msg_tx.clone();
+    // liveliness declaring
+    let liveliness_prefix = format!("chain-id:{}/", config.get_chain_origin());
+    let _liveliness_token = session
+        .liveliness()
+        .declare_token(&format!(
+            "{}{}@{}",
+            liveliness_prefix, config.domain, self_node_origin
+        ))
+        .res()
+        .await
+        .unwrap();
+
+    // liveliness subscriber
     let peers_to_update = peers.clone();
-    let _check_forward_subscriber = session
-        .declare_subscriber(format!("{}-check", config.get_chain_origin()))
+    let _liveliness_subscriber = session
+        .liveliness()
+        .declare_subscriber(format!("{}**", liveliness_prefix))
+        .querying()
         .callback(move |sample| {
-            let msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
-                .map_err(|e| error!("{e}"))
-                .unwrap();
-            if msg.origin != self_node_origin {
-                // update peer node_address
-                match std::str::from_utf8(&msg.msg) {
-                    Ok(check_msg) => {
-                        if let Some((time, domain)) = check_msg.split_once('@') {
-                            info!(
-                                "HEALTH_CHECK msg from: {} - {}, sent at: {}",
-                                domain, msg.origin, time
-                            );
-                            peers_to_update
-                                .write()
-                                .update_known_peer_node_address(domain, msg.origin);
-                        } else {
-                            error!("The format of health_check_msg is wrong: {}", check_msg)
+            if let Some(key_expr) = sample.key_expr.as_str().strip_prefix(&liveliness_prefix) {
+                if let Some((domain, origin)) = key_expr.split_once('@') {
+                    if let Ok(origin) = u64::from_str(origin) {
+                        match sample.kind {
+                            SampleKind::Put => {
+                                info!("Peer connected, new alive token ({} - {})", domain, origin);
+                                peers_to_update.write().add_connected_peer(domain, origin);
+                            }
+                            SampleKind::Delete => {
+                                info!("Peer offline, dropped token ({} - {})", domain, origin);
+                                peers_to_update.write().delete_connected_peer(domain);
+                            }
                         }
                     }
-                    Err(e) => error!("HEALTH_CHECK error: {}", e),
                 }
-                // send back
-                let _ = outbound_msg_tx.send(msg);
             }
         })
-        .best_effort()
         .res()
         .await
         .unwrap();
@@ -247,12 +252,7 @@ pub async fn zenoh_serve(
     let mut config_md5 = calculate_md5(config_path).unwrap();
     debug!("config file initial md5: {:x}", config_md5);
 
-    let mut hot_update_interval =
-        tokio::time::interval(tokio::time::Duration::from_secs(config.hot_update_interval));
-
-    let mut health_check_interval = tokio::time::interval(tokio::time::Duration::from_secs(
-        config.health_check_interval,
-    ));
+    let mut hot_update_interval = interval(Duration::from_secs(config.hot_update_interval));
 
     loop {
         tokio::select! {
@@ -297,51 +297,11 @@ pub async fn zenoh_serve(
                     if new_md5 != config_md5 {
                         info!("config file new md5: {:x}", new_md5);
                         config_md5 = new_md5;
-                        config = try_hot_update(config_path, network_svc.peers.clone(), session.config()).await;
+                        try_hot_update(config_path, network_svc.peers.clone(), session.config()).await;
                     }
                 } else {
                     warn!("calculate config file md5 failed, make sure it's not removed");
                 };
-
-                // update connected peers
-                let mut connected_peers = HashSet::new();
-                let peers_zid = session.info().peers_zid().res().await;
-                for peer_zid in peers_zid {
-                    for (domain, (_, peer_config)) in peers.read().get_known_peers().iter() {
-                        if compare_domain_with_zid(domain, &peer_zid) {
-                            connected_peers.insert(build_multiaddr("127.0.0.1", peer_config.port, domain));
-                        }
-                    }
-                }
-                {
-                    let mut peers = peers.write();
-                    peers.set_connected_peers(connected_peers);
-                }
-            },
-            // health check
-            _ = health_check_interval.tick() => {
-                // send msg check
-                let msg = format!("{}@{}", unix_now(), config.domain).as_bytes().to_vec();
-                let msg = NetworkMsg {
-                    module: "HEALTH_CHECK".to_string(),
-                    r#type: "HEALTH_CHECK".to_string(),
-                    origin: self_node_origin,
-                    msg,
-                };
-                let publisher = session
-                    .declare_publisher(format!("{}-check", config.get_chain_origin()))
-                    .congestion_control(zenoh::publication::CongestionControl::Block)
-                    .priority(Priority::DataHigh)
-                    .res()
-                    .await
-                    .unwrap();
-                let mut dst = BytesMut::new();
-                msg.encode(&mut dst).unwrap();
-                publisher
-                    .put(&*dst)
-                    .res()
-                    .await
-                    .unwrap();
             },
             else => {
                 debug!("network stopped!");
@@ -349,36 +309,4 @@ pub async fn zenoh_serve(
             }
         }
     }
-}
-
-fn domain_to_zid(domain: &str) -> ZenohId {
-    let domain_hash = calculate_hash(&domain);
-    debug!("domain_hash: {domain_hash}");
-    let domain_hash_hex = hex::encode_upper(domain_hash.to_be_bytes());
-    let domain_hash_hex = &domain_hash_hex[0..12];
-    debug!("domain_hash_hex[0..12]: {domain_hash_hex}");
-    let seed = hex::encode_upper(rand::random::<u16>().to_be_bytes());
-    ZenohId::from_str(&format!("{domain_hash_hex}{seed}")).unwrap()
-}
-
-fn compare_domain_with_zid(domain: &str, zid: &ZenohId) -> bool {
-    let domain_hash = calculate_hash(&domain);
-    debug!("domain_hash: {domain_hash}");
-    let domain_hash_hex = hex::encode_upper(domain_hash.to_be_bytes());
-    let domain_hash_hex = &domain_hash_hex[0..12];
-
-    if zid.to_string()[0..12].eq(domain_hash_hex) {
-        return true;
-    }
-    false
-}
-
-#[test]
-fn test_domain_to_zid() {
-    assert!(compare_domain_with_zid("0", &domain_to_zid("0")));
-    assert!(compare_domain_with_zid("test", &domain_to_zid("test")));
-    assert!(compare_domain_with_zid(
-        "test-chain-78325234897562387465",
-        &domain_to_zid("test-chain-78325234897562387465")
-    ));
 }

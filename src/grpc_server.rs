@@ -48,7 +48,6 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         request: Request<NetworkMsg>,
     ) -> Result<Response<StatusCode>, tonic::Status> {
         cloud_util::tracer::set_parent(&request);
-        debug!("send_msg request: {:?}", request);
 
         let msg = request.into_inner();
         debug!("send_msg: {:?}", &msg);
@@ -66,7 +65,6 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         request: Request<NetworkMsg>,
     ) -> Result<Response<StatusCode>, tonic::Status> {
         cloud_util::tracer::set_parent(&request);
-        debug!("broadcast request: {:?}", request);
 
         let mut msg = request.into_inner();
         debug!("broadcast: {:?}", &msg);
@@ -138,8 +136,7 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         {
             let mut peers = self.peers.write();
 
-            let multiaddr = build_multiaddr("127.0.0.1", port, &domain);
-            if peers.get_connected_peers().contains(&multiaddr) {
+            if peers.get_connected_peers().contains(&domain) {
                 //add a connected peer
                 return Ok(Response::new(StatusCodeEnum::AddExistedPeer.into()));
             }
@@ -174,14 +171,12 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         {
             peers = self.peers.read().get_connected_peers().clone();
         }
-        for addr in peers.iter() {
-            if let Some((_, _, domain)) = parse_multiaddr(addr) {
-                if let Some((origin, _)) = self.peers.read().get_known_peers().get(&domain) {
-                    node_infos.push(NodeNetInfo {
-                        multi_address: addr.to_string(),
-                        origin: *origin,
-                    });
-                }
+        for domain in peers.iter() {
+            if let Some((origin, peer_config)) = self.peers.read().get_known_peers().get(domain) {
+                node_infos.push(NodeNetInfo {
+                    multi_address: build_multiaddr("127.0.0.1", peer_config.port, domain),
+                    origin: *origin,
+                });
             }
         }
 
