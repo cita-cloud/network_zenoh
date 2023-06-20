@@ -14,9 +14,7 @@
 
 use md5::{compute, Digest};
 use std::{
-    collections::hash_map::DefaultHasher,
     fs,
-    hash::{Hash, Hasher},
     io::{Error, Write},
     path::{self, Path},
 };
@@ -96,12 +94,6 @@ pub fn to_u64(tmp: &str) -> u64 {
     let mut decoded = [0; 8];
     hex::decode_to_slice(tmp, &mut decoded).unwrap();
     u64::from_be_bytes(decoded)
-}
-
-pub fn calculate_hash<T: Hash>(t: &T) -> u64 {
-    let mut s = DefaultHasher::new();
-    t.hash(&mut s);
-    s.finish()
 }
 
 pub fn clap_about() -> String {

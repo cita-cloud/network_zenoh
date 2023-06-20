@@ -43,21 +43,18 @@ impl PeersManger {
         self.known_peers.insert(domain, peer)
     }
 
-    pub fn update_known_peer_node_address(&mut self, domain: &str, origin: u64) {
-        if let Some((addr, _)) = self.known_peers.get_mut(domain) {
-            *addr = origin;
-        }
-    }
-
     pub fn get_connected_peers(&self) -> &HashSet<String> {
         &self.connected_peers
     }
 
-    pub fn set_connected_peers(&mut self, peers: HashSet<String>) {
-        self.connected_peers = peers;
+    pub fn add_connected_peer(&mut self, domain: &str, origin: u64) {
+        if let Some((addr, _)) = self.known_peers.get_mut(domain) {
+            *addr = origin;
+            self.connected_peers.insert(domain.to_owned());
+        }
     }
 
-    fn delete_connected_peers(&mut self, domain: &str) {
+    pub fn delete_connected_peer(&mut self, domain: &str) {
         if self.connected_peers.get(domain).is_some() {
             debug!("delete_connected_peers: {}", domain);
             self.connected_peers.remove(domain);
@@ -68,7 +65,7 @@ impl PeersManger {
         if self.known_peers.contains_key(domain) {
             debug!("delete_peer: {}", domain);
             self.known_peers.remove(domain);
-            self.delete_connected_peers(domain);
+            self.delete_connected_peer(domain);
         }
     }
 }
