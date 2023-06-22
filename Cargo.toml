@@ -27,5 +27,5 @@ tower = "0.4"
 rand = "0.8"
 
 zenoh = { git = "https://github.com/cita-cloud/zenoh.git", tag = "v6.6.3-sp1" }
-cloud-util = "0.6.0"
-cita_cloud_proto = "6.6.3"
+cloud-util = "=0.6.0"
+cita_cloud_proto = "=6.6.3"
