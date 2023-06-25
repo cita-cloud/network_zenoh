@@ -31,19 +31,13 @@ use crate::peer::PeersManger;
 pub struct HealthCheckServer {
     peers: Arc<RwLock<PeersManger>>,
     timestamp: AtomicU64,
-    send_msg_check: Arc<RwLock<u64>>,
     timeout: u64,
 }
 
 impl HealthCheckServer {
-    pub fn new(
-        peers: Arc<RwLock<PeersManger>>,
-        send_msg_check: Arc<RwLock<u64>>,
-        timeout: u64,
-    ) -> Self {
+    pub fn new(peers: Arc<RwLock<PeersManger>>, timeout: u64) -> Self {
         HealthCheckServer {
             peers,
-            send_msg_check,
             timestamp: AtomicU64::new(unix_now()),
             timeout,
         }
@@ -65,9 +59,8 @@ impl Health for HealthCheckServer {
             self.timestamp.store(timestamp, Ordering::Relaxed);
         }
         let old_timestamp = self.timestamp.load(Ordering::Relaxed);
-        let send_check_timeout = timestamp - *self.send_msg_check.read();
         let timeout = self.timeout * 1000;
-        let status = if timestamp - old_timestamp > timeout || send_check_timeout > timeout {
+        let status = if timestamp - old_timestamp > timeout {
             // peer is offline for a long time
             ServingStatus::NotServing.into()
         } else {
