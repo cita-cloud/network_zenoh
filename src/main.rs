@@ -36,7 +36,6 @@ use cita_cloud_proto::{
 use clap::Parser;
 use cloud_util::metrics::{run_metrics_exporter, MiddlewareLayer};
 use cloud_util::panic_hook::set_panic_handler;
-use cloud_util::unix_now;
 use flume::unbounded;
 use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
@@ -118,13 +117,9 @@ async fn run(opts: RunOpts) {
         dispatch_table.insert(module.module_name.clone(), client);
     }
 
-    let send_msg_check = Arc::new(RwLock::new(unix_now()));
-    let send_msg_check_ = send_msg_check.clone();
-
     let dispatcher = NetworkMsgDispatcher {
         dispatch_table: dispatch_table.clone(),
         inbound_msg_rx,
-        send_msg_check: send_msg_check_,
     };
     tokio::spawn(async move {
         dispatcher.run().await;
@@ -176,7 +171,6 @@ async fn run(opts: RunOpts) {
                 )
                 .add_service(HealthServer::new(HealthCheckServer::new(
                     peers_for_health_check,
-                    send_msg_check,
                     config.health_check_timeout,
                 )))
                 .serve(grpc_addr)
@@ -192,7 +186,6 @@ async fn run(opts: RunOpts) {
                 )
                 .add_service(HealthServer::new(HealthCheckServer::new(
                     peers_for_health_check,
-                    send_msg_check,
                     config.health_check_timeout,
                 )))
                 .serve(grpc_addr)
