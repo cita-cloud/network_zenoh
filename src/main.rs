@@ -35,7 +35,6 @@ use cita_cloud_proto::{
 };
 use clap::Parser;
 use cloud_util::metrics::{run_metrics_exporter, MiddlewareLayer};
-use cloud_util::panic_hook::set_panic_handler;
 use flume::unbounded;
 use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
@@ -44,7 +43,6 @@ use util::clap_about;
 const CLIENT_NAME: &str = "network";
 
 fn main() {
-    set_panic_handler();
     let opts: Opts = Opts::parse();
     // You can handle information about subcommands by requesting their matches by name
     // (as below), requesting just the name used, or both at the same time
@@ -83,8 +81,7 @@ struct RunOpts {
 async fn run(opts: RunOpts) {
     ::std::env::set_var("RUST_BACKTRACE", "full");
 
-    #[cfg(not(windows))]
-    tokio::spawn(cloud_util::signal::handle_signals());
+    let rx_signal = cloud_util::graceful_shutdown::graceful_shutdown();
 
     // read config.toml
     let config = NetworkConfig::new(&opts.config_path);
@@ -161,6 +158,7 @@ async fn run(opts: RunOpts) {
     };
 
     info!("start network_zenoh grpc server!");
+    let rx_for_grpc = rx_signal.clone();
     if layer.is_some() {
         info!("metrics on");
         tokio::spawn(async move {
@@ -173,7 +171,10 @@ async fn run(opts: RunOpts) {
                     peers_for_health_check,
                     config.health_check_timeout,
                 )))
-                .serve(grpc_addr)
+                .serve_with_shutdown(
+                    grpc_addr,
+                    cloud_util::graceful_shutdown::grpc_serve_listen_term(rx_for_grpc),
+                )
                 .await
                 .unwrap();
         });
@@ -188,7 +189,10 @@ async fn run(opts: RunOpts) {
                     peers_for_health_check,
                     config.health_check_timeout,
                 )))
-                .serve(grpc_addr)
+                .serve_with_shutdown(
+                    grpc_addr,
+                    cloud_util::graceful_shutdown::grpc_serve_listen_term(rx_for_grpc),
+                )
                 .await
                 .unwrap();
         });
@@ -200,6 +204,7 @@ async fn run(opts: RunOpts) {
         &opts.config_path,
         network_svc_hot_update,
         outbound_msg_rx,
+        rx_signal,
     )
     .await
 }

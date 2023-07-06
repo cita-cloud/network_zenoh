@@ -37,6 +37,7 @@ pub async fn zenoh_serve(
     config_path: &str,
     network_svc: CitaCloudNetworkServiceServer,
     outbound_msg_rx: flume::Receiver<NetworkMsg>,
+    rx: flume::Receiver<()>,
 ) {
     // read config.toml
     let config = NetworkConfig::new(config_path);
@@ -303,8 +304,12 @@ pub async fn zenoh_serve(
                     warn!("calculate config file md5 failed, make sure it's not removed");
                 };
             },
+            _ = rx.recv_async() => {
+                info!("zenoh session exit!");
+                break;
+            },
             else => {
-                debug!("network stopped!");
+                debug!("zenoh session exit!");
                 break;
             }
         }
