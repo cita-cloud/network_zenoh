@@ -41,5 +41,4 @@ features = ['derive']
 
 [dependencies.zenoh]
 version = '0.7.2-rc'
-tag = 'v6.7.1-beta1'
 features = ['unstable']
