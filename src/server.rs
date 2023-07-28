@@ -106,10 +106,11 @@ pub async fn zenoh_serve(
         .unwrap();
 
     // Set listen endpoints
-    zenoh_config
-        .listen
-        .endpoints
-        .push(config.get_address().parse().unwrap());
+    zenoh_config.listen.endpoints.push(
+        format!("{}/0.0.0.0:{}", config.protocol, config.port)
+            .parse()
+            .unwrap(),
+    );
 
     // Which zenoh nodes to connect to
     for peer in &config.peers {
