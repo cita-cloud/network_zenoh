@@ -106,9 +106,6 @@ impl NetworkConfig {
         config.validator_address = fs::read_to_string(validator_address_path).unwrap();
         config
     }
-    pub fn get_address(&self) -> String {
-        format!("{}/{}:{}", self.protocol, self.domain, self.port)
-    }
     pub fn get_node_origin(&self) -> u64 {
         to_u64(&self.node_address[0..16])
     }
