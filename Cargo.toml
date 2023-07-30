@@ -6,6 +6,9 @@ edition = "2021"
 
 [dependencies]
 zenoh = { git = "https://github.com/cita-cloud/zenoh.git", tag = "v6.6.0" }
+tempfile = "=3.6.0"
+async-global-executor = "=2.2.0"
+rustls-native-certs = "=0.6.2"
 flume = "0.10"
 tokio = { version = "1.20", features = ["rt-multi-thread", "time"] }
 tokio-util = "0.7"
