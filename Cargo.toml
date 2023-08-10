@@ -9,26 +9,31 @@ zenoh = { git = "https://github.com/cita-cloud/zenoh.git", tag = "v6.6.0" }
 tempfile = "=3.6.0"
 async-global-executor = "=2.2.0"
 rustls-native-certs = "=0.6.2"
-flume = "0.10"
-tokio = { version = "1.20", features = ["rt-multi-thread", "time"] }
-tokio-util = "0.7"
-parking_lot = "0.12"
-toml = "0.5"
-serde = { version = "1.0", features = ["derive"] }
-bytes = "1.2"
-hex = "0.4"
-thiserror =  "1.0"
-tentacle-multiaddr = "0.3"
-clap = { version = "3.2", features = ["derive"] }
-backtrace = "0.3"
-log = "0.4"
-log4rs = { version = "1.1", features = ["gzip"] }
-md5 = "0.7"
-json5 = "0.4"
+flume = "=0.10"
+tokio = { version = "=1.20", features = ["rt-multi-thread", "time"] }
+tokio-util = "=0.7"
+parking_lot = "=0.12"
+toml = "=0.5"
+serde = { version = "=1.0", features = ["derive"] }
+bytes = "=1.2"
+hex = "=0.4"
+thiserror =  "=1.0"
+tentacle-multiaddr = "=0.3"
+clap = { version = "=3.2", features = ["derive"] }
+backtrace = "=0.3"
+log = "=0.4"
+log4rs = { version = "=1.1", features = ["gzip"] }
+md5 = "=0.7"
+json5 = "=0.4"
 
-tonic = "0.7"
-prost = "0.10"
+tonic = "=0.7"
+prost = "=0.10"
 
-cloud-util = "0.4.1"
-cita_cloud_proto = "6.6.0"
-status_code = { package = "cloud-code", version = "0.4.0" }
+cloud-util = "=0.4.1"
+cita_cloud_proto = "=6.6.0"
+status_code = { package = "cloud-code", version = "=0.4.0" }
+
+[patch.crates-io]
+linux-raw-sys = { git = 'https://github.com/rink1969/linux-raw-sys', branch = 'v0.3.8-sw' }
+libc = { git = 'https://github.com/rink1969/libc', branch = '0.2.147-sw' }
+nix = { git = 'https://github.com/rink1969/nix', branch = 'v0.22.3-sw' }
