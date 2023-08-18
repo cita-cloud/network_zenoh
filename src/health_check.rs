@@ -50,7 +50,7 @@ impl Health for HealthCheckServer {
         &self,
         _request: Request<HealthCheckRequest>,
     ) -> Result<Response<HealthCheckResponse>, Status> {
-        info!("healthcheck entry!");
+        info!("health check entry!");
 
         let timestamp = unix_now();
         let peer_count = self.peers.read().get_connected_peers().len() as u64;

@@ -41,43 +41,43 @@ pub struct ModuleConfig {
 #[derive(Serialize, Deserialize)]
 #[serde(default)]
 pub struct NetworkConfig {
-    // server grpc port, as network_port
+    /// server grpc port, as network_port
     pub grpc_port: u16,
-    // zenoh protocol
+    /// zenoh protocol
     pub protocol: String,
-    // zenoh port
+    /// zenoh port
     pub port: u16,
-    // domain
+    /// domain
     pub domain: String,
-    // CA certification, raw string
+    /// CA certification, raw string
     pub ca_cert: String,
-    // Server certification, raw string
+    /// Server certification, raw string
     pub cert: String,
-    // Server certification private key
+    /// Server certification private key
     pub priv_key: String,
-    // peers net config info
+    /// peers net config info
     pub peers: Vec<PeerConfig>,
-    // node address file path
+    /// node address file path
     pub node_address: String,
-    // validator address file path
+    /// validator address file path
     pub validator_address: String,
-    // chain id
+    /// chain id
     pub chain_id: String,
-    // QoS
+    /// QoS
     pub qos: bool,
-    // local_routing
+    /// local_routing
     pub local_routing: bool,
-    // scouting
+    /// scouting
     pub scouting: bool,
-    // Link lease duration in milliseconds (default: 10000)
+    /// Link lease duration in milliseconds (default: 10000)
     pub lease: u64,
-    // Number fo keep-alive messages in a link lease duration (default: 4)
+    /// Number fo keep-alive messages in a link lease duration (default: 4)
     pub keep_alive: usize,
-    // config hot update interval, in senconds
+    /// config hot update interval, in seconds
     pub hot_update_interval: u64,
-    // modules config info
+    /// modules config info
     pub modules: Vec<ModuleConfig>,
-    /// health check interval, in senconds
+    /// health check interval, in seconds
     pub health_check_interval: u64,
     /// health check timeout
     pub health_check_timeout: u64,
@@ -87,11 +87,11 @@ pub struct NetworkConfig {
     pub metrics_port: u16,
     /// metrics histogram buckets
     pub metrics_buckets: Vec<f64>,
-    // Receiving buffer size in bytes for each link
-    // The default the rx_buffer_size value is the same as the default batch size: 65335.
-    // For very high throughput scenarios, the rx_buffer_size can be increased to accomoda
-    // more in-flight data. This is particularly relevant when dealing with large messages
-    // E.g. for 16MiB rx_buffer_size set the value to: 16777216.
+    /// Receiving buffer size in bytes for each link
+    /// The default the rx_buffer_size value is the same as the default batch size: 65335.
+    /// For very high throughput scenarios, the rx_buffer_size can be increased to accomodate
+    /// more in-flight data. This is particularly relevant when dealing with large messages.
+    /// E.g. for 16MiB rx_buffer_size set the value to: 16777216.
     pub rx_buffer_size: usize,
     /// log config
     pub log_config: LogConfig,

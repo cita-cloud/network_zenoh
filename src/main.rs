@@ -122,7 +122,7 @@ async fn run(opts: RunOpts) {
         dispatcher.run().await;
     });
 
-    // knownpeers
+    // known peers
     let mut peers_map = HashMap::new();
     for peer in &config.peers {
         peers_map.insert(peer.domain.to_string(), (0, peer.clone()));

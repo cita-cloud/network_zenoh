@@ -47,7 +47,7 @@ pub async fn try_hot_update(
         .map(|p| p.domain.to_owned())
         .collect::<Vec<String>>();
     debug!("peers in config file: {:?}", new_peers);
-    //try to add node
+    // try to add node
     let mut connect_peers = Vec::new();
     for p in &new_config.peers {
         let peer = PeerConfig {
@@ -71,7 +71,7 @@ pub async fn try_hot_update(
             &json5::to_string(&connect_peers).unwrap(),
         )
         .unwrap();
-    //try to delete node
+    // try to delete node
     for p in known_peers {
         if !new_peers.contains(&p) {
             let mut guard = peers.write();
