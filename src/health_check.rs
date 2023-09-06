@@ -53,9 +53,15 @@ impl Health for HealthCheckServer {
         info!("health check entry!");
 
         let timestamp = unix_now();
-        let peer_count = self.peers.read().get_connected_peers().len() as u64;
+        let (peer_count, known_peer_count) = {
+            let peers = self.peers.read();
+            (
+                peers.get_connected_peers().len() as u64,
+                peers.get_known_peers().len() as u64,
+            )
+        };
 
-        if peer_count > 0 {
+        if known_peer_count == 0 || peer_count > 0 {
             self.timestamp.store(timestamp, Ordering::Relaxed);
         }
         let old_timestamp = self.timestamp.load(Ordering::Relaxed);
