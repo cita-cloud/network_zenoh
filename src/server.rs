@@ -72,7 +72,7 @@ pub async fn zenoh_serve(
         .transport
         .link
         .tx
-        .set_lease(Some(config.lease))
+        .set_lease(config.lease)
         .unwrap();
 
     // Number fo keep-alive messages in a link lease duration (default: 4)
@@ -80,7 +80,7 @@ pub async fn zenoh_serve(
         .transport
         .link
         .tx
-        .set_keep_alive(Some(config.keep_alive))
+        .set_keep_alive(config.keep_alive)
         .unwrap();
 
     // Receiving buffer size in bytes for each link
@@ -88,15 +88,11 @@ pub async fn zenoh_serve(
         .transport
         .link
         .rx
-        .set_buffer_size(Some(config.rx_buffer_size))
+        .set_buffer_size(config.rx_buffer_size)
         .unwrap();
 
     // Maximum number of unicast incoming links per transport session
-    zenoh_config
-        .transport
-        .unicast
-        .set_max_links(Some(4))
-        .unwrap();
+    zenoh_config.transport.unicast.set_max_links(4).unwrap();
 
     // the shared-memory transport will be disabled.
     zenoh_config

@@ -159,11 +159,11 @@ async fn run(opts: RunOpts) {
 
     info!("start network_zenoh grpc server!");
     let rx_for_grpc = rx_signal.clone();
-    if layer.is_some() {
+    if let Some(layer) = layer {
         info!("metrics on");
         tokio::spawn(async move {
             tonic::transport::Server::builder()
-                .layer(layer.unwrap())
+                .layer(layer)
                 .add_service(
                     NetworkServiceServer::new(network_svc).max_decoding_message_size(usize::MAX),
                 )
