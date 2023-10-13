@@ -1,6 +1,6 @@
 [package]
 name = "network"
-version = "6.7.2-beta.1"
+version = "6.7.2-beta.2"
 authors = ["Rivtower Technologies <contact@rivtower.com>"]
 edition = "2021"
 
@@ -30,5 +30,5 @@ zenoh = { version = "0.10.0-rc", default-features = false, features = [
 ] }
 zenoh-ext = "0.10.0-rc"
 
-cloud-util = "0.8.0-beta.1"
-cita_cloud_proto = "=6.7.2-beta.1"
+cloud-util = "=0.8.0-beta.2"
+cita_cloud_proto = "=6.7.2-beta.2"
