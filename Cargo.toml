@@ -1,34 +1,34 @@
 [package]
 name = "network"
-version = "6.7.2"
+version = "6.7.3"
 authors = ["Rivtower Technologies <contact@rivtower.com>"]
 edition = "2021"
 
 [dependencies]
 flume = "0.11"
-tokio = { version = "1.32", features = ["rt-multi-thread", "time"] }
+tokio = { version = "1.36", features = ["rt-multi-thread", "time"] }
 tokio-util = "0.7"
 parking_lot = "0.12"
 toml = "0.8"
 serde = { version = "1.0", features = ["derive"] }
-bytes = "1.4"
+bytes = "1.5"
 hex = "0.4"
 thiserror = "1.0"
 tentacle-multiaddr = "0.3"
-clap = { version = "4.3", features = ["derive"] }
+clap = { version = "4.5", features = ["derive"] }
 md5 = "0.7"
 json5 = "0.4"
-tonic = "0.10"
+tonic = "0.11"
 prost = "0.12"
 tower = "0.4"
 tracing = "0.1"
 rand = "0.8"
-zenoh = { version = "0.10.0-rc", default-features = false, features = [
+zenoh = { version = "0.10.1-rc", default-features = false, features = [
     "unstable",
     "transport_quic",
     "transport_tls",
 ] }
-zenoh-ext = "0.10.0-rc"
+zenoh-ext = "0.10.1-rc"
 
 cloud-util = { package = "cloud-util", git = "https://github.com/cita-cloud/cloud-common-rs" }
 cita_cloud_proto = { package = "cita_cloud_proto", git = "https://github.com/cita-cloud/cloud-common-rs" }
