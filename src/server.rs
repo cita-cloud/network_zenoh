@@ -18,7 +18,10 @@ use prost::Message;
 use r#async::AsyncResolve;
 use std::{str::FromStr, sync::Arc, time::Duration};
 use tokio::time::interval;
-use zenoh::{config::QoSConf, prelude::*};
+use zenoh::{
+    config::{QoSMulticastConf, QoSUnicastConf},
+    prelude::*,
+};
 use zenoh_ext::SubscriberBuilderExt;
 
 use cita_cloud_proto::network::NetworkMsg;
@@ -64,7 +67,13 @@ pub async fn zenoh_serve(
     // QoS
     zenoh_config
         .transport
-        .set_qos(QoSConf::new(config.qos).unwrap())
+        .unicast
+        .set_qos(QoSUnicastConf::new(config.qos).unwrap())
+        .unwrap();
+    zenoh_config
+        .transport
+        .multicast
+        .set_qos(QoSMulticastConf::new(config.qos).unwrap())
         .unwrap();
 
     // Link lease duration in milliseconds (default: 10000)
