@@ -125,7 +125,7 @@ async fn run(opts: RunOpts) {
     // known peers
     let mut peers_map = HashMap::new();
     for peer in &config.peers {
-        peers_map.insert(peer.domain.to_string(), (0, peer.clone()));
+        peers_map.insert(peer.domain.to_string(), peer.clone());
     }
 
     let peers = Arc::new(RwLock::new(PeersManger::new(peers_map)));

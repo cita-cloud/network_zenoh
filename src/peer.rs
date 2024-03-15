@@ -12,46 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::config::PeerConfig;
 
 #[derive(Debug)]
 pub struct PeersManger {
-    known_peers: HashMap<String, (u64, PeerConfig)>,
-    connected_peers: HashSet<String>,
+    known_peers: HashMap<String, PeerConfig>,
+    connected_peers: HashMap<String, u64>,
 }
 
 impl PeersManger {
-    pub fn new(known_peers: HashMap<String, (u64, PeerConfig)>) -> Self {
+    pub fn new(known_peers: HashMap<String, PeerConfig>) -> Self {
         Self {
             known_peers,
-            connected_peers: HashSet::new(),
+            connected_peers: HashMap::new(),
         }
     }
 
-    pub fn get_known_peers(&self) -> &HashMap<String, (u64, PeerConfig)> {
+    pub fn get_known_peers(&self) -> &HashMap<String, PeerConfig> {
         &self.known_peers
     }
 
-    pub fn add_known_peers(
-        &mut self,
-        domain: String,
-        peer: (u64, PeerConfig),
-    ) -> Option<(u64, PeerConfig)> {
+    pub fn add_known_peers(&mut self, domain: String, peer: PeerConfig) -> Option<PeerConfig> {
         debug!("add_from_config_peers: {}", domain);
         self.known_peers.insert(domain, peer)
     }
 
-    pub fn get_connected_peers(&self) -> &HashSet<String> {
+    pub fn get_connected_peers(&self) -> &HashMap<String, u64> {
         &self.connected_peers
     }
 
     pub fn add_connected_peer(&mut self, domain: &str, origin: u64) {
-        if let Some((addr, _)) = self.known_peers.get_mut(domain) {
-            *addr = origin;
-            self.connected_peers.insert(domain.to_owned());
-        }
+        self.connected_peers.insert(domain.to_owned(), origin);
     }
 
     pub fn delete_connected_peer(&mut self, domain: &str) {

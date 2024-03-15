@@ -136,7 +136,7 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         {
             let mut peers = self.peers.write();
 
-            if peers.get_connected_peers().contains(&domain) {
+            if peers.get_connected_peers().contains_key(&domain) {
                 //add a connected peer
                 return Ok(Response::new(StatusCodeEnum::AddExistedPeer.into()));
             }
@@ -151,7 +151,7 @@ impl NetworkService for CitaCloudNetworkServiceServer {
                 port,
             };
 
-            peers.add_known_peers(domain, (0, peer));
+            peers.add_known_peers(domain, peer);
         }
         info!("peer added: {}", &address);
 
@@ -171,8 +171,8 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         {
             peers = self.peers.read().get_connected_peers().clone();
         }
-        for domain in peers.iter() {
-            if let Some((origin, peer_config)) = self.peers.read().get_known_peers().get(domain) {
+        for (domain, origin) in peers.iter() {
+            if let Some(peer_config) = self.peers.read().get_known_peers().get(domain) {
                 node_infos.push(NodeNetInfo {
                     multi_address: build_multiaddr("127.0.0.1", peer_config.port, domain),
                     origin: *origin,
