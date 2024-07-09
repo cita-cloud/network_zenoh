@@ -115,7 +115,7 @@ async fn run(opts: RunOpts) {
     }
 
     let dispatcher = NetworkMsgDispatcher {
-        dispatch_table: dispatch_table.clone(),
+        dispatch_table,
         inbound_msg_rx,
     };
     tokio::spawn(async move {
@@ -132,7 +132,6 @@ async fn run(opts: RunOpts) {
 
     // grpc server
     let network_svc = CitaCloudNetworkServiceServer {
-        dispatch_table,
         peers: peers.clone(),
         inbound_msg_tx: inbound_msg_tx.clone(),
         outbound_msg_tx: outbound_msg_tx.clone(),
