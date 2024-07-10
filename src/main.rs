@@ -115,7 +115,7 @@ async fn run(opts: RunOpts) {
     }
 
     let dispatcher = NetworkMsgDispatcher {
-        dispatch_table: dispatch_table.clone(),
+        dispatch_table,
         inbound_msg_rx,
     };
     tokio::spawn(async move {
@@ -132,14 +132,13 @@ async fn run(opts: RunOpts) {
 
     // grpc server
     let network_svc = CitaCloudNetworkServiceServer {
-        dispatch_table,
         peers: peers.clone(),
         inbound_msg_tx: inbound_msg_tx.clone(),
         outbound_msg_tx: outbound_msg_tx.clone(),
         chain_origin: config.get_chain_origin(),
     };
     let network_svc_hot_update = network_svc.clone();
-    let grpc_addr = format!("0.0.0.0:{grpc_port}").parse().unwrap();
+    let grpc_addr = format!("[::]:{grpc_port}").parse().unwrap();
     let peers_for_health_check = peers.clone();
 
     // add layer if metrics is enabled

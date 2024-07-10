@@ -48,7 +48,7 @@ impl PeersManger {
     }
 
     pub fn delete_connected_peer(&mut self, domain: &str) {
-        if self.connected_peers.get(domain).is_some() {
+        if self.connected_peers.contains_key(domain) {
             debug!("delete_connected_peers: {}", domain);
             self.connected_peers.remove(domain);
         }

@@ -12,17 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use cita_cloud_proto::client::InterceptedSvc;
 use cita_cloud_proto::common::{Empty, NodeNetInfo, StatusCode, TotalNodeNetInfo};
 use cita_cloud_proto::network::{
-    network_msg_handler_service_client::NetworkMsgHandlerServiceClient,
     network_service_server::NetworkService, NetworkMsg, NetworkStatusResponse, RegisterInfo,
 };
-use cita_cloud_proto::retry::RetryClient;
 use cita_cloud_proto::status_code::StatusCodeEnum;
 use flume::Sender;
 use parking_lot::RwLock;
-use std::collections::HashMap;
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 
@@ -32,8 +28,6 @@ use crate::util::{build_multiaddr, parse_multiaddr};
 
 #[derive(Clone)]
 pub struct CitaCloudNetworkServiceServer {
-    pub dispatch_table:
-        HashMap<String, RetryClient<NetworkMsgHandlerServiceClient<InterceptedSvc>>>,
     pub peers: Arc<RwLock<PeersManger>>,
     pub inbound_msg_tx: Sender<NetworkMsg>,
     pub outbound_msg_tx: Sender<NetworkMsg>,
@@ -125,7 +119,7 @@ impl NetworkService for CitaCloudNetworkServiceServer {
 
         let address = format!("quic/{domain}:{port}");
 
-        let endpoint: zenoh::prelude::config::EndPoint = address.parse().map_err(|_| {
+        let endpoint: zenoh::config::EndPoint = address.parse().map_err(|_| {
             warn!("parse_addr: not a valid address: {}", address);
             Status::invalid_argument(StatusCodeEnum::MultiAddrParseError.to_string())
         })?;

@@ -15,12 +15,13 @@
 use bytes::BytesMut;
 use parking_lot::RwLock;
 use prost::Message;
-use r#async::AsyncResolve;
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{io::Read, str::FromStr, sync::Arc, time::Duration};
 use tokio::time::interval;
 use zenoh::{
-    config::{QoSMulticastConf, QoSUnicastConf},
+    config::{QoSMulticastConf, QoSUnicastConf, ZenohId},
     prelude::*,
+    qos::{CongestionControl, Priority},
+    sample::SampleKind,
 };
 use zenoh_ext::SubscriberBuilderExt;
 
@@ -45,7 +46,7 @@ pub async fn zenoh_serve(
     // read config.toml
     let config = NetworkConfig::new(config_path);
     // Peer instance mode
-    let mut zenoh_config = zenoh::prelude::config::peer();
+    let mut zenoh_config = zenoh::config::peer();
 
     // Use rand ZenohId
     let zid = ZenohId::default();
@@ -111,19 +112,20 @@ pub async fn zenoh_serve(
         .unwrap();
 
     // Set listen endpoints
-    zenoh_config.listen.endpoints.push(
-        format!("{}/0.0.0.0:{}", config.protocol, config.port)
+    zenoh_config
+        .listen
+        .endpoints
+        .set(vec![format!("{}/[::]:{}", config.protocol, config.port)
             .parse()
-            .unwrap(),
-    );
+            .unwrap()])
+        .unwrap();
 
     // Which zenoh nodes to connect to
+    let mut connect_peers = Vec::new();
     for peer in &config.peers {
-        zenoh_config
-            .connect
-            .endpoints
-            .push(peer.get_address().parse().unwrap());
+        connect_peers.push(peer.get_address().parse().unwrap());
     }
+    zenoh_config.connect.endpoints.set(connect_peers).unwrap();
 
     // cert
     write_to_file(config.ca_cert.as_bytes(), "ca_cert.pem");
@@ -155,7 +157,7 @@ pub async fn zenoh_serve(
         .unwrap();
 
     // open zenoh session
-    let session = zenoh::open(zenoh_config).res().await.unwrap();
+    let session = zenoh::open(zenoh_config).await.unwrap();
 
     let self_node_origin = config.get_node_origin();
     let self_validator_origin = config.get_validator_origin();
@@ -165,14 +167,13 @@ pub async fn zenoh_serve(
     let _node_subscriber = session
         .declare_subscriber(self_node_origin.to_string())
         .callback(move |sample| {
-            let msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
-                .map_err(|e| error!("{e}"))
-                .unwrap();
+            let mut buf = BytesMut::new();
+            sample.payload().reader().read_exact(&mut buf).unwrap();
+            let msg = NetworkMsg::decode(buf).map_err(|e| error!("{e}")).unwrap();
             debug!("inbound msg node: {:?}", &msg);
             inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
         })
         .best_effort()
-        .res()
         .await
         .unwrap();
 
@@ -181,16 +182,15 @@ pub async fn zenoh_serve(
     let _chain_subscriber = session
         .declare_subscriber(config.get_chain_origin().to_string())
         .callback(move |sample| {
-            let msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
-                .map_err(|e| error!("{e}"))
-                .unwrap();
+            let mut buf = BytesMut::new();
+            sample.payload().reader().read_exact(&mut buf).unwrap();
+            let msg = NetworkMsg::decode(buf).map_err(|e| error!("{e}")).unwrap();
             if msg.origin != self_node_origin {
                 debug!("inbound msg chain: {:?}", &msg);
                 inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
             }
         })
         .best_effort()
-        .res()
         .await
         .unwrap();
 
@@ -202,16 +202,15 @@ pub async fn zenoh_serve(
         _validator_subscriber = session
             .declare_subscriber(self_validator_origin.to_string())
             .callback(move |sample| {
-                let msg = NetworkMsg::decode(&*sample.value.payload.contiguous())
-                    .map_err(|e| error!("{e}"))
-                    .unwrap();
+                let mut buf = BytesMut::new();
+                sample.payload().reader().read_exact(&mut buf).unwrap();
+                let msg = NetworkMsg::decode(buf).map_err(|e| error!("{e}")).unwrap();
                 if msg.origin != self_node_origin {
                     debug!("inbound msg validator: {:?}", &msg);
                     inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
                 }
             })
             .best_effort()
-            .res()
             .await
             .unwrap();
     }
@@ -224,7 +223,6 @@ pub async fn zenoh_serve(
             "{}{}@{}",
             liveliness_prefix, config.domain, self_node_origin
         ))
-        .res()
         .await
         .unwrap();
 
@@ -235,10 +233,10 @@ pub async fn zenoh_serve(
         .declare_subscriber(format!("{}**", liveliness_prefix))
         .querying()
         .callback(move |sample| {
-            if let Some(key_expr) = sample.key_expr.as_str().strip_prefix(&liveliness_prefix) {
+            if let Some(key_expr) = sample.key_expr().as_str().strip_prefix(&liveliness_prefix) {
                 if let Some((domain, origin)) = key_expr.split_once('@') {
                     if let Ok(origin) = u64::from_str(origin) {
-                        match sample.kind {
+                        match sample.kind() {
                             SampleKind::Put => {
                                 info!("Peer connected, new alive token ({} - {})", domain, origin);
                                 peers_to_update.write().add_connected_peer(domain, origin);
@@ -252,7 +250,6 @@ pub async fn zenoh_serve(
                 }
             }
         })
-        .res()
         .await
         .unwrap();
 
@@ -278,9 +275,8 @@ pub async fn zenoh_serve(
                     };
                     let publisher = session
                         .declare_publisher(msg.origin.to_string())
-                        .congestion_control(zenoh::publication::CongestionControl::Block)
+                        .congestion_control(CongestionControl::Block)
                         .priority(priority)
-                        .res()
                         .await
                         .unwrap();
                     msg.origin = if "consensus".eq(&msg.module) {
@@ -292,7 +288,6 @@ pub async fn zenoh_serve(
                     msg.encode(&mut dst).unwrap();
                     publisher
                         .put(&*dst)
-                        .res()
                         .await
                         .unwrap();
                 }
