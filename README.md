@@ -74,12 +74,16 @@ Options:
 ```
 $ network run -c example/config.toml
 
-2023-02-08T09:38:08.501559Z  INFO network: grpc port of network_zenoh: 50000
-2023-02-08T09:38:08.502427Z  INFO network: start network_zenoh grpc server!
-2023-02-08T09:38:08.502463Z  INFO network: metrics on
-2023-02-08T09:38:08.502533Z  INFO cloud_util::metrics: exporting metrics to http://0.0.0.0:60000/metrics
-2023-02-08T09:38:08.504638Z  INFO zenoh::net::runtime: Using PID: 7A38F110A4661FE3    
-2023-02-08T09:38:08.514381Z  INFO zenoh::net::runtime::orchestrator: zenohd can be reached at quic/127.0.0.1:40000 
+2024-07-10T10:56:04.120025+08:00  INFO network: grpc port of network_zenoh: 50000
+2024-07-10T10:56:04.120429+08:00  INFO network: start network_zenoh grpc server!
+2024-07-10T10:56:04.120432+08:00  INFO network: metrics on
+2024-07-10T10:56:04.120764+08:00  INFO network::server: ZenohId: b350db8dedbbd3818c9566b103829f7f
+2024-07-10T10:56:04.1222+08:00  INFO zenoh::net::runtime: Using ZID: b350db8dedbbd3818c9566b103829f7f
+2024-07-10T10:56:04.124933+08:00  INFO zenoh::net::runtime::orchestrator: Zenoh can be reached at: quic/198.18.0.1:40000
+...
+2024-07-10T10:56:04.124985+08:00  INFO zenoh::net::runtime::orchestrator: Zenoh can be reached at: quic/[fe80::1]:40000
+2024-07-10T10:56:04.62724+08:00  WARN zenoh::net::runtime::orchestrator: Scouting delay elapsed before start conditions are met.
+2024-07-10T10:56:04.629143+08:00  INFO network::server: Peer connected, new alive token (test-chain-0 - 14075586594044653895)
 
 ```
 

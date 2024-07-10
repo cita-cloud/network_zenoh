@@ -138,7 +138,7 @@ async fn run(opts: RunOpts) {
         chain_origin: config.get_chain_origin(),
     };
     let network_svc_hot_update = network_svc.clone();
-    let grpc_addr = format!("0.0.0.0:{grpc_port}").parse().unwrap();
+    let grpc_addr = format!("[::]:{grpc_port}").parse().unwrap();
     let peers_for_health_check = peers.clone();
 
     // add layer if metrics is enabled

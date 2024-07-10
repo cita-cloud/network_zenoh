@@ -1,6 +1,6 @@
 [package]
 name = "network"
-version = "6.7.3"
+version = "6.7.4"
 authors = ["Rivtower Technologies <contact@rivtower.com>"]
 edition = "2021"
 
@@ -23,12 +23,12 @@ prost = "0.13"
 tower = "0.4"
 tracing = "0.1"
 rand = "0.8"
-zenoh = { version = "1.0.0-alpha.2", default-features = false, features = [
+zenoh = { version = "1.0.0-alpha.3", git = "https://github.com/eclipse-zenoh/zenoh", branch = "release/1.0.0-alpha.3", default-features = false, features = [
     "unstable",
     "transport_quic",
     "transport_tls",
 ] }
-zenoh-ext = "1.0.0-alpha.2"
+zenoh-ext = { version = "1.0.0-alpha.3", git = "https://github.com/eclipse-zenoh/zenoh", branch = "release/1.0.0-alpha.3" }
 
-cloud-util = { package = "cloud-util", git = "https://github.com/cita-cloud/cloud-common-rs", branch = "bump_dept" }
-cita_cloud_proto = { package = "cita_cloud_proto", git = "https://github.com/cita-cloud/cloud-common-rs", branch = "bump_dept" }
+cloud-util = { package = "cloud-util", git = "https://github.com/cita-cloud/cloud-common-rs" }
+cita_cloud_proto = { package = "cita_cloud_proto", git = "https://github.com/cita-cloud/cloud-common-rs" }

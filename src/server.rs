@@ -18,11 +18,9 @@ use prost::Message;
 use std::{io::Read, str::FromStr, sync::Arc, time::Duration};
 use tokio::time::interval;
 use zenoh::{
-    config::{QoSMulticastConf, QoSUnicastConf},
-    core::Priority,
-    info::ZenohId,
+    config::{QoSMulticastConf, QoSUnicastConf, ZenohId},
     prelude::*,
-    publisher::CongestionControl,
+    qos::{CongestionControl, Priority},
     sample::SampleKind,
 };
 use zenoh_ext::SubscriberBuilderExt;
@@ -114,19 +112,20 @@ pub async fn zenoh_serve(
         .unwrap();
 
     // Set listen endpoints
-    zenoh_config.listen.endpoints.push(
-        format!("{}/0.0.0.0:{}", config.protocol, config.port)
+    zenoh_config
+        .listen
+        .endpoints
+        .set(vec![format!("{}/[::]:{}", config.protocol, config.port)
             .parse()
-            .unwrap(),
-    );
+            .unwrap()])
+        .unwrap();
 
     // Which zenoh nodes to connect to
+    let mut connect_peers = Vec::new();
     for peer in &config.peers {
-        zenoh_config
-            .connect
-            .endpoints
-            .push(peer.get_address().parse().unwrap());
+        connect_peers.push(peer.get_address().parse().unwrap());
     }
+    zenoh_config.connect.endpoints.set(connect_peers).unwrap();
 
     // cert
     write_to_file(config.ca_cert.as_bytes(), "ca_cert.pem");
