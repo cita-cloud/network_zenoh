@@ -168,7 +168,7 @@ impl NetworkService for CitaCloudNetworkServiceServer {
         for (domain, origin) in peers.iter() {
             if let Some(peer_config) = self.peers.read().get_known_peers().get(domain) {
                 node_infos.push(NodeNetInfo {
-                    multi_address: build_multiaddr("127.0.0.1", peer_config.port, domain),
+                    multi_address: build_multiaddr("localhost", peer_config.port, domain),
                     origin: *origin,
                 });
             }
