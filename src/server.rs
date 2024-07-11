@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use bytes::BytesMut;
 use parking_lot::RwLock;
 use prost::Message;
-use std::{io::Read, str::FromStr, sync::Arc, time::Duration};
+use std::{borrow::Cow, io::Cursor, str::FromStr, sync::Arc, time::Duration};
 use tokio::time::interval;
 use zenoh::{
+    bytes::ZBytes,
     config::{QoSMulticastConf, QoSUnicastConf, ZenohId},
     prelude::*,
     qos::{CongestionControl, Priority},
@@ -167,9 +167,11 @@ pub async fn zenoh_serve(
     let _node_subscriber = session
         .declare_subscriber(self_node_origin.to_string())
         .callback(move |sample| {
-            let mut buf = BytesMut::new();
-            sample.payload().reader().read_exact(&mut buf).unwrap();
-            let msg = NetworkMsg::decode(buf).map_err(|e| error!("{e}")).unwrap();
+            let msg = NetworkMsg::decode(Cursor::new(
+                sample.payload().deserialize::<Cow<[u8]>>().unwrap(),
+            ))
+            .map_err(|e| error!("{e}"))
+            .unwrap();
             debug!("inbound msg node: {:?}", &msg);
             inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
         })
@@ -182,9 +184,11 @@ pub async fn zenoh_serve(
     let _chain_subscriber = session
         .declare_subscriber(config.get_chain_origin().to_string())
         .callback(move |sample| {
-            let mut buf = BytesMut::new();
-            sample.payload().reader().read_exact(&mut buf).unwrap();
-            let msg = NetworkMsg::decode(buf).map_err(|e| error!("{e}")).unwrap();
+            let msg = NetworkMsg::decode(Cursor::new(
+                sample.payload().deserialize::<Cow<[u8]>>().unwrap(),
+            ))
+            .map_err(|e| error!("{e}"))
+            .unwrap();
             if msg.origin != self_node_origin {
                 debug!("inbound msg chain: {:?}", &msg);
                 inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
@@ -202,9 +206,11 @@ pub async fn zenoh_serve(
         _validator_subscriber = session
             .declare_subscriber(self_validator_origin.to_string())
             .callback(move |sample| {
-                let mut buf = BytesMut::new();
-                sample.payload().reader().read_exact(&mut buf).unwrap();
-                let msg = NetworkMsg::decode(buf).map_err(|e| error!("{e}")).unwrap();
+                let msg = NetworkMsg::decode(Cursor::new(
+                    sample.payload().deserialize::<Cow<[u8]>>().unwrap(),
+                ))
+                .map_err(|e| error!("{e}"))
+                .unwrap();
                 if msg.origin != self_node_origin {
                     debug!("inbound msg validator: {:?}", &msg);
                     inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
@@ -284,10 +290,9 @@ pub async fn zenoh_serve(
                     } else {
                         self_node_origin
                     };
-                    let mut dst = BytesMut::new();
-                    msg.encode(&mut dst).unwrap();
+                    let payload = ZBytes::from(msg.encode_to_vec());
                     publisher
-                        .put(&*dst)
+                        .put(payload)
                         .await
                         .unwrap();
                 }
