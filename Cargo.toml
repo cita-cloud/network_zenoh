@@ -23,12 +23,12 @@ prost = "0.13"
 tower = "0.4"
 tracing = "0.1"
 rand = "0.8"
-zenoh = { version = "1.0.0-alpha.4", default-features = false, features = [
+zenoh = { version = "1.0.0-alpha.5", default-features = false, features = [
     "unstable",
     "transport_quic",
     "transport_tls",
 ] }
-zenoh-ext = "1.0.0-alpha.4"
+zenoh-ext = "1.0.0-alpha.5"
 
 cloud-util = { package = "cloud-util", git = "https://github.com/cita-cloud/cloud-common-rs" }
 cita_cloud_proto = { package = "cita_cloud_proto", git = "https://github.com/cita-cloud/cloud-common-rs" }
