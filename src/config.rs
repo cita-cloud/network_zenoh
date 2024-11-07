@@ -63,8 +63,6 @@ pub struct NetworkConfig {
     pub validator_address: String,
     /// chain id
     pub chain_id: String,
-    /// QoS
-    pub qos: bool,
     /// local_routing
     pub local_routing: bool,
     /// scouting
@@ -131,7 +129,6 @@ impl Default for NetworkConfig {
             node_address: "".to_string(),
             validator_address: "".to_string(),
             chain_id: "".to_string(),
-            qos: true,
             local_routing: false,
             scouting: false,
             lease: 10000,

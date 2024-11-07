@@ -14,12 +14,11 @@
 
 use parking_lot::RwLock;
 use prost::Message;
-use std::{borrow::Cow, io::Cursor, str::FromStr, sync::Arc, time::Duration};
+use std::{str::FromStr, sync::Arc, time::Duration};
 use tokio::time::interval;
 use zenoh::{
     bytes::ZBytes,
-    config::{QoSMulticastConf, QoSUnicastConf, ZenohId},
-    prelude::*,
+    config::ZenohId,
     qos::{CongestionControl, Priority},
     sample::SampleKind,
 };
@@ -46,7 +45,7 @@ pub async fn zenoh_serve(
     // read config.toml
     let config = NetworkConfig::new(config_path);
     // Peer instance mode
-    let mut zenoh_config = zenoh::config::peer();
+    let mut zenoh_config = zenoh::config::Config::default();
 
     // Use rand ZenohId
     let zid = ZenohId::default();
@@ -63,18 +62,6 @@ pub async fn zenoh_serve(
         .scouting
         .multicast
         .set_enabled(Some(config.scouting))
-        .unwrap();
-
-    // QoS
-    zenoh_config
-        .transport
-        .unicast
-        .set_qos(QoSUnicastConf::new(config.qos).unwrap())
-        .unwrap();
-    zenoh_config
-        .transport
-        .multicast
-        .set_qos(QoSMulticastConf::new(config.qos).unwrap())
         .unwrap();
 
     // Link lease duration in milliseconds (default: 10000)
@@ -147,13 +134,13 @@ pub async fn zenoh_serve(
         .transport
         .link
         .tls
-        .set_server_certificate(Some(format!("{}_cert.pem", &config.domain)))
+        .set_listen_certificate(Some(format!("{}_cert.pem", &config.domain)))
         .unwrap();
     zenoh_config
         .transport
         .link
         .tls
-        .set_server_private_key(Some(format!("{}_key.pem", &config.domain)))
+        .set_listen_private_key(Some(format!("{}_key.pem", &config.domain)))
         .unwrap();
 
     // open zenoh session
@@ -167,15 +154,12 @@ pub async fn zenoh_serve(
     let _node_subscriber = session
         .declare_subscriber(self_node_origin.to_string())
         .callback(move |sample| {
-            let msg = NetworkMsg::decode(Cursor::new(
-                sample.payload().deserialize::<Cow<[u8]>>().unwrap(),
-            ))
-            .map_err(|e| error!("{e}"))
-            .unwrap();
+            let msg = NetworkMsg::decode(&*sample.payload().to_bytes())
+                .map_err(|e| error!("{e}"))
+                .unwrap();
             debug!("inbound msg node: {:?}", &msg);
             inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
         })
-        .best_effort()
         .await
         .unwrap();
 
@@ -184,17 +168,14 @@ pub async fn zenoh_serve(
     let _chain_subscriber = session
         .declare_subscriber(config.get_chain_origin().to_string())
         .callback(move |sample| {
-            let msg = NetworkMsg::decode(Cursor::new(
-                sample.payload().deserialize::<Cow<[u8]>>().unwrap(),
-            ))
-            .map_err(|e| error!("{e}"))
-            .unwrap();
+            let msg = NetworkMsg::decode(&*sample.payload().to_bytes())
+                .map_err(|e| error!("{e}"))
+                .unwrap();
             if msg.origin != self_node_origin {
                 debug!("inbound msg chain: {:?}", &msg);
                 inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
             }
         })
-        .best_effort()
         .await
         .unwrap();
 
@@ -206,17 +187,14 @@ pub async fn zenoh_serve(
         _validator_subscriber = session
             .declare_subscriber(self_validator_origin.to_string())
             .callback(move |sample| {
-                let msg = NetworkMsg::decode(Cursor::new(
-                    sample.payload().deserialize::<Cow<[u8]>>().unwrap(),
-                ))
-                .map_err(|e| error!("{e}"))
-                .unwrap();
+                let msg = NetworkMsg::decode(&*sample.payload().to_bytes())
+                    .map_err(|e| error!("{e}"))
+                    .unwrap();
                 if msg.origin != self_node_origin {
                     debug!("inbound msg validator: {:?}", &msg);
                     inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
                 }
             })
-            .best_effort()
             .await
             .unwrap();
     }
