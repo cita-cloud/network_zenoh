@@ -13,13 +13,13 @@
 // limitations under the License.
 
 use std::sync::{
-    atomic::{AtomicU64, Ordering},
     Arc,
+    atomic::{AtomicU64, Ordering},
 };
 
 use cita_cloud_proto::health_check::{
-    health_check_response::ServingStatus, health_server::Health, HealthCheckRequest,
-    HealthCheckResponse,
+    HealthCheckRequest, HealthCheckResponse, health_check_response::ServingStatus,
+    health_server::Health,
 };
 use cloud_util::unix_now;
 use parking_lot::RwLock;

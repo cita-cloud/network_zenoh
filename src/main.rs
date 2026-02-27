@@ -34,7 +34,7 @@ use cita_cloud_proto::{
     network::network_service_server::NetworkServiceServer,
 };
 use clap::Parser;
-use cloud_util::metrics::{run_metrics_exporter, MiddlewareLayer};
+use cloud_util::metrics::{MiddlewareLayer, run_metrics_exporter};
 use flume::unbounded;
 use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
@@ -79,8 +79,6 @@ struct RunOpts {
 }
 
 async fn run(opts: RunOpts) {
-    ::std::env::set_var("RUST_BACKTRACE", "full");
-
     let rx_signal = cloud_util::graceful_shutdown::graceful_shutdown();
 
     // read config.toml

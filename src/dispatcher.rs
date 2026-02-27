@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 use cita_cloud_proto::client::{InterceptedSvc, NetworkMsgHandlerServiceClientTrait};
 use cita_cloud_proto::network::{
-    network_msg_handler_service_client::NetworkMsgHandlerServiceClient, NetworkMsg,
+    NetworkMsg, network_msg_handler_service_client::NetworkMsgHandlerServiceClient,
 };
 use cita_cloud_proto::retry::RetryClient;
 use flume::Receiver;
@@ -38,7 +38,8 @@ impl NetworkMsgDispatcher {
                 tokio::spawn(async move {
                     if let Err(e) = client.process_network_msg(msg).await {
                         warn!(
-                            "client processes network msg failed: msg.module {} msg.origin {}, error: {}", &msg_module, &msg_origin, e
+                            "client processes network msg failed: msg.module {} msg.origin {}, error: {}",
+                            &msg_module, &msg_origin, e
                         );
                     }
                 });

@@ -14,7 +14,7 @@
 
 use cita_cloud_proto::common::{Empty, NodeNetInfo, StatusCode, TotalNodeNetInfo};
 use cita_cloud_proto::network::{
-    network_service_server::NetworkService, NetworkMsg, NetworkStatusResponse, RegisterInfo,
+    NetworkMsg, NetworkStatusResponse, RegisterInfo, network_service_server::NetworkService,
 };
 use cita_cloud_proto::status_code::StatusCodeEnum;
 use flume::Sender;

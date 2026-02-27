@@ -15,7 +15,7 @@
 use std::sync::Arc;
 
 use parking_lot::RwLock;
-use zenoh::config::{Config, Notifier};
+use zenoh_config::GenericConfig;
 
 use crate::{
     config::{NetworkConfig, PeerConfig},
@@ -25,7 +25,7 @@ use crate::{
 pub async fn try_hot_update(
     path: &str,
     peers: Arc<RwLock<PeersManger>>,
-    zenoh_config: &Notifier<Config>,
+    zenoh_config: &GenericConfig,
 ) -> NetworkConfig {
     let new_config = NetworkConfig::new(path);
     let known_peers;
@@ -33,8 +33,8 @@ pub async fn try_hot_update(
         known_peers = peers
             .read()
             .get_known_peers()
-            .iter()
-            .map(|(s, _)| s.to_owned())
+            .keys()
+            .cloned()
             .collect::<Vec<String>>();
     }
     debug!("known peers: {:?}", known_peers);
