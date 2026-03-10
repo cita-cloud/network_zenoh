@@ -22,7 +22,7 @@ tonic = "0.14"
 prost = "0.14"
 tower = "0.5"
 tracing = "0.1"
-rand = "0.9"
+rand = "0.10"
 zenoh = { version = "1.7", default-features = false, features = [
     "unstable",
     "internal",

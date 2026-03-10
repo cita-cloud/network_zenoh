@@ -22,7 +22,7 @@ use zenoh::{
     qos::{CongestionControl, Priority},
     sample::SampleKind,
 };
-use zenoh_ext::{AdvancedPublisherBuilderExt, AdvancedSubscriberBuilderExt};
+use zenoh_ext::AdvancedPublisherBuilderExt;
 
 use cita_cloud_proto::network::NetworkMsg;
 use util::write_to_file;
@@ -153,30 +153,23 @@ pub async fn zenoh_serve(
 
     // node subscriber
     let inbound_msg_tx = network_svc.inbound_msg_tx.clone();
-    let node_subscriber = session
+    let _node_subscriber = session
         .declare_subscriber(self_node_origin.to_string())
-        .advanced()
-        .await
-        .unwrap();
-    tokio::spawn(async move {
-        while let Ok(sample) = node_subscriber.recv_async().await {
+        .callback(move |sample| {
             let msg = NetworkMsg::decode(&*sample.payload().to_bytes())
                 .map_err(|e| error!("{e}"))
                 .unwrap();
             debug!("inbound msg node: {:?}", &msg);
             inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
-        }
-    });
+        })
+        .await
+        .unwrap();
 
     // chain subscriber
     let inbound_msg_tx = network_svc.inbound_msg_tx.clone();
-    let chain_subscriber = session
+    let _chain_subscriber = session
         .declare_subscriber(config.get_chain_origin().to_string())
-        .advanced()
-        .await
-        .unwrap();
-    tokio::spawn(async move {
-        while let Ok(sample) = chain_subscriber.recv_async().await {
+        .callback(move |sample| {
             let msg = NetworkMsg::decode(&*sample.payload().to_bytes())
                 .map_err(|e| error!("{e}"))
                 .unwrap();
@@ -184,20 +177,18 @@ pub async fn zenoh_serve(
                 debug!("inbound msg chain: {:?}", &msg);
                 inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
             }
-        }
-    });
+        })
+        .await
+        .unwrap();
 
     // When the controller (node) address is the same as the consensus address, simply subscribe to the controller (node) address
+    let _validator_subscriber;
     if self_node_origin != self_validator_origin {
         debug!("------ (node_origin != validator_origin)");
         let inbound_msg_tx = network_svc.inbound_msg_tx.clone();
-        let validator_subscriber = session
+        _validator_subscriber = session
             .declare_subscriber(self_validator_origin.to_string())
-            .advanced()
-            .await
-            .unwrap();
-        tokio::spawn(async move {
-            while let Ok(sample) = validator_subscriber.recv_async().await {
+            .callback(move |sample| {
                 let msg = NetworkMsg::decode(&*sample.payload().to_bytes())
                     .map_err(|e| error!("{e}"))
                     .unwrap();
@@ -205,8 +196,9 @@ pub async fn zenoh_serve(
                     debug!("inbound msg validator: {:?}", &msg);
                     inbound_msg_tx.send(msg).map_err(|e| error!("{e}")).unwrap();
                 }
-            }
-        });
+            })
+            .await
+            .unwrap();
     }
 
     // liveliness declaring
@@ -222,56 +214,29 @@ pub async fn zenoh_serve(
 
     // liveliness subscriber
     let peers_to_update = peers.clone();
-    let selector = format!("{}**", liveliness_prefix);
-
-    let liveliness_subscriber = session
+    let _liveliness_subscriber = session
         .liveliness()
-        .declare_subscriber(&selector)
-        .await
-        .unwrap();
-
-    let peers_to_update_sub = peers_to_update.clone();
-    let liveliness_prefix_sub = liveliness_prefix.clone();
-    tokio::spawn(async move {
-        while let Ok(sample) = liveliness_subscriber.recv_async().await {
-            if let Some(key_expr) = sample
-                .key_expr()
-                .as_str()
-                .strip_prefix(&liveliness_prefix_sub)
+        .declare_subscriber(format!("{}**", liveliness_prefix))
+        .history(true)
+        .callback(move |sample| {
+            if let Some(key_expr) = sample.key_expr().as_str().strip_prefix(&liveliness_prefix)
                 && let Some((domain, origin)) = key_expr.split_once('@')
                 && let Ok(origin) = u64::from_str(origin)
             {
                 match sample.kind() {
                     SampleKind::Put => {
                         info!("Peer connected, new alive token ({} - {})", domain, origin);
-                        peers_to_update_sub
-                            .write()
-                            .add_connected_peer(domain, origin);
+                        peers_to_update.write().add_connected_peer(domain, origin);
                     }
                     SampleKind::Delete => {
                         info!("Peer offline, dropped token ({} - {})", domain, origin);
-                        peers_to_update_sub.write().delete_connected_peer(domain);
+                        peers_to_update.write().delete_connected_peer(domain);
                     }
                 }
             }
-        }
-    });
-
-    if let Ok(receiver) = session.get(&selector).await {
-        while let Ok(reply) = receiver.recv_async().await {
-            if let Ok(sample) = reply.into_result()
-                && let Some(key_expr) = sample.key_expr().as_str().strip_prefix(&liveliness_prefix)
-                && let Some((domain, origin)) = key_expr.split_once('@')
-                && let Ok(origin) = u64::from_str(origin)
-            {
-                info!(
-                    "Peer connected, existing alive token ({} - {})",
-                    domain, origin
-                );
-                peers_to_update.write().add_connected_peer(domain, origin);
-            }
-        }
-    }
+        })
+        .await
+        .unwrap();
 
     let mut config_md5 = calculate_md5(config_path).unwrap();
     debug!("config file initial md5: {:x}", config_md5);
