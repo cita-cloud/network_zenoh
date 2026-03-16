@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use md5::{compute, Digest};
+use md5::{Digest, compute};
 use std::{
     fs,
     io::{Error, Write},

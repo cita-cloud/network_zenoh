@@ -22,7 +22,7 @@ use zenoh::{
     qos::{CongestionControl, Priority},
     sample::SampleKind,
 };
-use zenoh_ext::SubscriberBuilderExt;
+use zenoh_ext::AdvancedPublisherBuilderExt;
 
 use cita_cloud_proto::network::NetworkMsg;
 use util::write_to_file;
@@ -50,7 +50,7 @@ pub async fn zenoh_serve(
     // Use rand ZenohId
     let zid = ZenohId::default();
     info!("ZenohId: {zid}");
-    zenoh_config.set_id(zid).unwrap();
+    zenoh_config.set_id(Some(zid)).unwrap();
 
     zenoh_config
         .scouting
@@ -102,9 +102,11 @@ pub async fn zenoh_serve(
     zenoh_config
         .listen
         .endpoints
-        .set(vec![format!("{}/[::]:{}", config.protocol, config.port)
-            .parse()
-            .unwrap()])
+        .set(vec![
+            format!("{}/[::]:{}", config.protocol, config.port)
+                .parse()
+                .unwrap(),
+        ])
         .unwrap();
 
     // Which zenoh nodes to connect to
@@ -215,21 +217,20 @@ pub async fn zenoh_serve(
     let _liveliness_subscriber = session
         .liveliness()
         .declare_subscriber(format!("{}**", liveliness_prefix))
-        .querying()
+        .history(true)
         .callback(move |sample| {
-            if let Some(key_expr) = sample.key_expr().as_str().strip_prefix(&liveliness_prefix) {
-                if let Some((domain, origin)) = key_expr.split_once('@') {
-                    if let Ok(origin) = u64::from_str(origin) {
-                        match sample.kind() {
-                            SampleKind::Put => {
-                                info!("Peer connected, new alive token ({} - {})", domain, origin);
-                                peers_to_update.write().add_connected_peer(domain, origin);
-                            }
-                            SampleKind::Delete => {
-                                info!("Peer offline, dropped token ({} - {})", domain, origin);
-                                peers_to_update.write().delete_connected_peer(domain);
-                            }
-                        }
+            if let Some(key_expr) = sample.key_expr().as_str().strip_prefix(&liveliness_prefix)
+                && let Some((domain, origin)) = key_expr.split_once('@')
+                && let Ok(origin) = u64::from_str(origin)
+            {
+                match sample.kind() {
+                    SampleKind::Put => {
+                        info!("Peer connected, new alive token ({} - {})", domain, origin);
+                        peers_to_update.write().add_connected_peer(domain, origin);
+                    }
+                    SampleKind::Delete => {
+                        info!("Peer offline, dropped token ({} - {})", domain, origin);
+                        peers_to_update.write().delete_connected_peer(domain);
                     }
                 }
             }
@@ -259,6 +260,7 @@ pub async fn zenoh_serve(
                     };
                     let publisher = session
                         .declare_publisher(msg.origin.to_string())
+                        .advanced()
                         .congestion_control(CongestionControl::Block)
                         .priority(priority)
                         .await
@@ -282,7 +284,7 @@ pub async fn zenoh_serve(
                     if new_md5 != config_md5 {
                         info!("config file new md5: {:x}", new_md5);
                         config_md5 = new_md5;
-                        try_hot_update(config_path, network_svc.peers.clone(), session.config()).await;
+                        try_hot_update(config_path, network_svc.peers.clone(), &session.config()).await;
                     }
                 } else {
                     warn!("calculate config file md5 failed, make sure it's not removed");
