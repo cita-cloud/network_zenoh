@@ -15,7 +15,7 @@ bytes = "1.11"
 hex = "0.4"
 thiserror = "2.0"
 tentacle-multiaddr = "0.3"
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.6", features = ["derive"] }
 md5 = "0.8"
 json5 = "1.3"
 tonic = "0.14"
@@ -23,14 +23,14 @@ prost = "0.14"
 tower = "0.5"
 tracing = "0.1"
 rand = "0.10"
-zenoh = { version = "1.7", default-features = false, features = [
+zenoh = { version = "1.8", default-features = false, features = [
     "unstable",
     "internal",
     "transport_quic",
     "transport_tls",
 ] }
-zenoh-config = "1.7"
-zenoh-ext = { version = "1.7", features = ["unstable"] }
+zenoh-config = "1.8"
+zenoh-ext = { version = "1.8", features = ["unstable"] }
 
 cloud-util = { package = "cloud-util", git = "https://github.com/cita-cloud/cloud-common-rs", branch = "update" }
 cita_cloud_proto = { package = "cita_cloud_proto", git = "https://github.com/cita-cloud/cloud-common-rs", branch = "update" }
